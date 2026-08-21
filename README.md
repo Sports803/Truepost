@@ -1,31 +1,41 @@
 # Sports 803 Truepost
 
-Sports 803 Truepost is a static sports dashboard based on the supplied `index.html`. It includes the existing events, composition, thumbnail, scheduler, Blogger, and Firebase workflows, with a reference-style **Live TV Channels** section and OneTV stream aggregation.
+Sports 803 Truepost is a public static sports dashboard based on the supplied `index.html`. It includes the existing events, composition, thumbnail, scheduler, Blogger, and Firebase workflows, together with the reference-style **Live TV Channels** section and OneTV stream aggregation used by the Sports803 Event project.
 
-## What changed
+## Event-compatible configuration
 
-The Channels page now includes a live-TV grid, channel preview cards, a channel HTML generator, and the existing editable channel library. The stream aggregator no longer uses the Kafeizhibo source. It can scrape match cards from the OneTV-compatible source used by the reference Events repository (`https://oneball.live/`), construct the same HLS/player URLs, and match those sources to dashboard events by normalized team names. DDKanqu links in the dashboard now use `https://www.ddkqax.com`.
+Truepost now uses the same public defaults and database paths as [Sports803/Event](https://github.com/Sports803/Event): the shared Google OAuth client ID is prefilled for browser sign-in, the Firebase Realtime Database defaults to `https://sports-803-1b806-default-rtdb.firebaseio.com`, events use `s803config/todaysMatches`, and live channels use `livetv/channels`. The Channels page can load and merge live channel records directly from that Firebase node.
 
-The repository also includes a scheduled GitHub Actions workflow at `.github/workflows/onetv-autopost.yml`. It runs every ten minutes, scans OneTV, skips IDs recorded in `data/onetv-posted.json`, publishes up to the configured batch limit to Blogger, optionally pushes the resulting event to Firebase, and commits only the non-secret posted-ID ledger back to the repository. `workflow_dispatch` is available for an immediate manual run.
+The reference player route is `https://sports803.github.io/player/`. OneTV-compatible match cards are read from `https://oneball.live/`, normalized by team names and kickoff time, and converted into Sports803 player URLs. DDKQAX lookups in the dashboard use `https://www.ddkqax.com`.
 
-## Required repository secrets
+## GitHub Actions autopublishing
+
+`.github/workflows/onetv-autopost.yml` runs every ten minutes and also supports manual dispatch. It follows the reference Event repository’s secret names and publication model: it scans OneTV, skips IDs already recorded locally or under Firebase `automation/bloggerPosts`, publishes up to `MAX_POSTS_PER_RUN` items to Blogger, writes the website-compatible event card to `s803config/todaysMatches`, and records the Blogger result in the shared automation ledger. The local `data/onetv-posted.json` file remains a non-secret fallback ledger and is committed by the workflow after successful runs.
+
+The workflow uses Node.js 22 and the same `npm run auto-publish` entry-point convention as the reference repository. `FIREBASE_PUBLIC_WRITE` is explicitly disabled; authenticated Firebase access is required for automation runs.
+
+## Required GitHub Actions secrets
 
 | Secret | Purpose |
 | --- | --- |
-| `BLOGGER_CLIENT_ID` | Google OAuth client ID for Blogger |
-| `BLOGGER_CLIENT_SECRET` | Google OAuth client secret |
-| `BLOGGER_REFRESH_TOKEN` | Long-lived Google OAuth refresh token with Blogger write access |
-| `BLOGGER_BLOG_ID` | Target Blogger blog ID |
-| `FIREBASE_DATABASE_URL` | Firebase Realtime Database URL, optional if Firebase sync is not needed |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase service-account JSON, optional when `FIREBASE_AUTH_TOKEN` is supplied |
-| `FIREBASE_AUTH_TOKEN` | Optional Firebase database token alternative |
+| `BLOGGER_BLOG_ID` | Target Blogger blog identifier |
+| `GOOGLE_CLIENT_ID` | Google OAuth application client ID used by Sports803/Event |
+| `GOOGLE_CLIENT_SECRET` | OAuth client secret for the same Google application |
+| `GOOGLE_REFRESH_TOKEN` | Long-lived Blogger authorization refresh token |
+| `IMGBB_KEY` | ImgBB upload key reserved for thumbnail or inline-image hosting extensions |
+| `FIREBASE_DATABASE_URL` | Firebase Realtime Database URL; defaults to the shared Event database when omitted |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Authenticated Firebase service-account JSON |
+| `FIREBASE_AUTH_TOKEN` | Optional legacy Firebase REST token alternative |
+| `SPORTMONKS_API_TOKEN` | Optional provider lookup token retained for Event-compatible automation configuration |
 
-Optional repository secrets or variables are `ONETV_SOURCE_URL`, `ONETV_STREAM_BASE_URL`, `PLAYER_BASE_URL`, `FIREBASE_EVENTS_PATH`, and `AUTOPOST_BATCH_LIMIT`. The workflow defaults to the reference repository’s OneTV-compatible source and Sports803 player route when these values are not supplied.
+The OAuth client ID is safe to use in browser-based Google Identity Services, but the client secret, refresh token, Firebase credentials, and ImgBB key must remain GitHub Secrets. They are not copied into this public repository.
+
+Optional repository secrets or variables include `ONETV_SOURCE_URL`, `ONETV_STREAM_BASE_URL`, `PLAYER_BASE_URL`, `FIREBASE_EVENTS_PATH`, `AUTOMATION_BLOGGER_POSTS_PATH`, and `MAX_POSTS_PER_RUN`. The workflow defaults to the reference Event paths and a batch limit of ten.
+
+## Static deployment
+
+`.github/workflows/pages.yml` deploys the static dashboard to GitHub Pages when enabled for the repository. The repository does not require a build step.
 
 ## Local checks
 
-The autoposter is dependency-free and uses the stock Node.js runtime. Run `node --check scripts/onetv-autopost.mjs` to validate its syntax. The static dashboard can be previewed with any static HTTP server; no build step is required.
-
-## Safety and authorization
-
-Only embed stream URLs and publish content for sources and accounts that you are authorized to use. Secrets must be configured in GitHub repository settings and must not be committed to this repository.
+Run `node --check scripts/onetv-autopost.mjs` to validate the autoposter syntax. Run `npm run auto-publish` only when the required Blogger and Firebase credentials are intentionally available in the environment. Never commit credentials or make Firebase publicly writable to bypass authentication errors.

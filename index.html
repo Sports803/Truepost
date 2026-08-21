@@ -586,7 +586,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
 <div class="page" id="page-channels">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap">
     <div style="font-family:var(--cond);font-size:1.4rem;font-weight:900;text-transform:uppercase">Live <span style="color:var(--red)">TV Channels</span></div>
-    <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn-green" onclick="renderLiveTVChannels()">↻ Refresh Live TV</button><button class="btn-red" onclick="openAddChannel()">+ Add Channel</button></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn-blue" onclick="loadFirebaseChannels()">📡 Load Event Channels</button><button class="btn-green" onclick="renderLiveTVChannels()">↻ Refresh Live TV</button><button class="btn-red" onclick="openAddChannel()">+ Add Channel</button></div>
   </div>
   <div class="card">
     <div class="card-title">📺 Live TV Channel Grid <span class="ct-right"><span id="live-tv-count" style="font-size:.62rem;color:var(--muted2);font-family:var(--mono)">0 channels</span></span></div>
@@ -745,6 +745,10 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
         <div class="form-group"><label>Media Player Base URL</label><input type="text" id="cfg-media-player-base" placeholder="https://sports803.github.io/player/"></div>
         <div class="form-group"><label>Prog.txt URL (SportsonLine)</label><input type="text" id="cfg-prog-txt-url" placeholder="https://sportsonline.st/prog.txt"></div>
       </div>
+      <div class="settings-grid" style="margin-bottom:12px">
+        <div class="form-group"><label>Event Firebase Database URL</label><input type="text" id="cfg-firebase-url" placeholder="https://sports-803-1b806-default-rtdb.firebaseio.com"></div>
+        <div class="form-group"><label>Event paths</label><input type="text" id="cfg-firebase-events-path" placeholder="s803config/todaysMatches"><input type="text" id="cfg-firebase-channels-path" placeholder="livetv/channels" style="margin-top:6px"></div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
         <label class="toggle" style="display:flex;align-items:center;gap:8px;font-size:.8rem;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px">
           <input type="checkbox" id="cfg-auto-fetch-streams" onchange="saveCFG()"><div class="tslider"></div>
@@ -876,14 +880,22 @@ const SK_CFG='s803v7_cfg',SK_CH='s803v7_ch',SK_POST='s803v7_post',SK_LOGO='s803v
 const ESPN='https://site.api.espn.com/apis/site/v2/sports';
 const TSDB='https://www.thesportsdb.com/api/v1/json/3';
 const CLAUDE_API='https://api.anthropic.com/v1/messages';
+// Public, non-secret defaults shared with Sports803/Event. OAuth secrets stay in GitHub Actions secrets.
+const EVENT_BUILTIN_CLIENT_ID='55046129292-15h9k5ga0lr1e3p3ptqg1iueeks49f7v.apps.googleusercontent.com';
+const EVENT_FIREBASE_DATABASE_URL='https://sports-803-1b806-default-rtdb.firebaseio.com';
+const EVENT_FIREBASE_EVENTS_PATH='s803config/todaysMatches';
+const EVENT_FIREBASE_CHANNELS_PATH='livetv/channels';
 
 let CFG={
-  blogId:'',clientId:'',imgbbKey:'',playerBase:'https://sports803.github.io/player/',
+  blogId:'',clientId:EVENT_BUILTIN_CLIENT_ID,imgbbKey:'',playerBase:'https://sports803.github.io/player/',
   activeLeagues:['ucl','epl','laliga','seriea','bundesliga','f1','nba','ufc'],
   schedTiming:60,schedStatus:'DRAFT',schedInterval:300000,
   schedEnabled:false,schedThumbs:true,logoOverridesRaw:'',
   mediaPlayerBase:'https://sports803.github.io/player/',
   progTxtUrl:'https://sportsonline.st/prog.txt',
+  firebaseDatabaseUrl:EVENT_FIREBASE_DATABASE_URL,
+  firebaseEventsPath:EVENT_FIREBASE_EVENTS_PATH,
+  firebaseChannelsPath:EVENT_FIREBASE_CHANNELS_PATH,
   autoFetchStreams:false,enableDdkanqu:false,enableOneTV:false,embedStreamsInPost:true,
   ddkanquMappingsRaw:'',
   deepseekKey:'',deepseekModel:'claude-sonnet-4-20250514',deepseekTone:'',deepseekLength:'medium',
@@ -983,6 +995,10 @@ function loadAll(){
   try{const p=JSON.parse(localStorage.getItem(SK_FR)||'{}');if(p.data)fullRacesData=p.data;}catch(e){}
   LOGO_OVERRIDES=parseLOOverrides(CFG.logoOverridesRaw);
   ddkanquMappings=parseDDKMappings(CFG.ddkanquMappingsRaw);
+  CFG.clientId=CFG.clientId||EVENT_BUILTIN_CLIENT_ID;
+  CFG.firebaseDatabaseUrl=CFG.firebaseDatabaseUrl||EVENT_FIREBASE_DATABASE_URL;
+  CFG.firebaseEventsPath=CFG.firebaseEventsPath||EVENT_FIREBASE_EVENTS_PATH;
+  CFG.firebaseChannelsPath=CFG.firebaseChannelsPath||EVENT_FIREBASE_CHANNELS_PATH;
   applyConfigToUI();
 }
 function saveAll(){
@@ -994,7 +1010,7 @@ function saveAll(){
   try{localStorage.setItem(SK_FR,JSON.stringify({data:fullRacesData,ts:Date.now()}));}catch(e){}
 }
 function saveCFG(){
-  CFG.blogId=v('cfg-blogid');CFG.clientId=v('cfg-clientid');
+  CFG.blogId=v('cfg-blogid');CFG.clientId=v('cfg-clientid')||EVENT_BUILTIN_CLIENT_ID;
   CFG.imgbbKey=v('cfg-imgbb');CFG.ytApiKey=v('cfg-yt-key');CFG.playerBase=v('cfg-player')||'https://sports803.github.io/player/';
   CFG.schedTiming=parseInt(document.getElementById('sched-timing')?.value||60);
   CFG.schedStatus=document.getElementById('sched-def-status')?.value||'DRAFT';
@@ -1002,6 +1018,9 @@ function saveCFG(){
   CFG.schedThumbs=document.getElementById('sched-thumbs')?.checked||false;
   CFG.mediaPlayerBase=v('cfg-media-player-base')||'https://sports803.github.io/player/';
   CFG.progTxtUrl=v('cfg-prog-txt-url')||'https://sportsonline.st/prog.txt';
+  CFG.firebaseDatabaseUrl=v('cfg-firebase-url')||EVENT_FIREBASE_DATABASE_URL;
+  CFG.firebaseEventsPath=v('cfg-firebase-events-path')||EVENT_FIREBASE_EVENTS_PATH;
+  CFG.firebaseChannelsPath=v('cfg-firebase-channels-path')||EVENT_FIREBASE_CHANNELS_PATH;
   CFG.autoFetchStreams=document.getElementById('cfg-auto-fetch-streams')?.checked||false;
   CFG.enableDdkanqu=document.getElementById('cfg-enable-ddkanqu')?.checked||false;
   CFG.enableOneTV=document.getElementById('cfg-enable-onetv')?.checked||false;
@@ -1026,6 +1045,9 @@ function applyConfigToUI(){
   document.getElementById('st-leagues').textContent=CFG.activeLeagues.length;
   set('cfg-media-player-base',CFG.mediaPlayerBase||'https://sports803.github.io/player/');
   set('cfg-prog-txt-url',CFG.progTxtUrl||'https://sportsonline.st/prog.txt');
+  set('cfg-firebase-url',CFG.firebaseDatabaseUrl||EVENT_FIREBASE_DATABASE_URL);
+  set('cfg-firebase-events-path',CFG.firebaseEventsPath||EVENT_FIREBASE_EVENTS_PATH);
+  set('cfg-firebase-channels-path',CFG.firebaseChannelsPath||EVENT_FIREBASE_CHANNELS_PATH);
   set('cfg-ddkanqu-mappings',CFG.ddkanquMappingsRaw||'');
   if(document.getElementById('cfg-auto-fetch-streams'))document.getElementById('cfg-auto-fetch-streams').checked=CFG.autoFetchStreams||false;
   if(document.getElementById('cfg-enable-ddkanqu'))document.getElementById('cfg-enable-ddkanqu').checked=CFG.enableDdkanqu||false;
@@ -1732,7 +1754,7 @@ function insertIframe(){const urls=getMoraURLs();if(!urls.length){toast('Add at 
 
 // ═══ BLOGGER AUTH ═══
 function handleAuth(){
-  if(accessToken){signOut();return;}if(!CFG.clientId){toast('Enter OAuth Client ID in Settings','e');return;}
+  if(accessToken){signOut();return;}CFG.clientId=CFG.clientId||EVENT_BUILTIN_CLIENT_ID;if(!CFG.clientId){toast('Enter OAuth Client ID in Settings','e');return;}
   const client=google.accounts.oauth2.initTokenClient({client_id:CFG.clientId,scope:'https://www.googleapis.com/auth/blogger',callback:r=>{if(r.error){toast('Auth error: '+r.error,'e');return;}accessToken=r.access_token;document.getElementById('auth-dot').className='on';document.getElementById('auth-label').textContent='Signed in';document.getElementById('auth-label').style.color='var(--green)';document.getElementById('auth-btn').textContent='Sign out';toast('Signed in ✓','s');}});
   client.requestAccessToken();
 }
@@ -1977,6 +1999,21 @@ function openAddChannel(){editingCH=null;document.getElementById('modal-ch-title
 function editCH(id){const c=channels.find(x=>x.id===id);if(!c)return;editingCH=id;document.getElementById('modal-ch-title').textContent='Edit Channel';set('ch-name',c.name);set('ch-region',c.region);set('ch-sport',c.sport);set('ch-url',c.url);openModal('modal-channel');}
 function saveChannel(){const name=v('ch-name');if(!name){toast('Name required','e');return;}const obj={name,region:v('ch-region'),sport:v('ch-sport'),url:v('ch-url')};if(editingCH){const i=channels.findIndex(c=>c.id===editingCH);if(i>-1)channels[i]={...channels[i],...obj};}else channels.push({id:'c'+Date.now(),...obj});saveAll();renderChannels();closeModal('modal-channel');toast('Channel saved ✓','s');}
 function deleteCH(id){if(!confirm('Delete?'))return;channels=channels.filter(c=>c.id!==id);saveAll();renderChannels();}
+async function loadFirebaseChannels(showToast=true){
+  const base=(CFG.firebaseDatabaseUrl||EVENT_FIREBASE_DATABASE_URL).replace(/\/$/,'');
+  const path=(CFG.firebaseChannelsPath||EVENT_FIREBASE_CHANNELS_PATH).replace(/^\/+|\/+$/g,'');
+  try{
+    const res=await fetch(base+'/'+path+'.json',{cache:'no-store',signal:AbortSignal.timeout(12000)});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    const imported=Object.entries(data||{}).map(([key,raw])=>({id:'fb_'+key,name:raw?.name||raw?.channelName||key,sport:raw?.sport||raw?.category||'live tv',region:raw?.region||'Global',url:raw?.src||raw?.url||raw?.embedUrl||'',logo:raw?.logo||raw?.logoUrl||''})).filter(c=>c.name);
+    const merged=new Map();
+    [...channels,...imported].forEach(c=>{const key=(c.url||c.name).toLowerCase();if(!merged.has(key)||(!merged.get(key).url&&c.url))merged.set(key,c);});
+    channels=[...merged.values()];saveAll();renderChannels();
+    if(showToast)toast('Loaded '+imported.length+' Event channels ✓','s');
+    return imported.length;
+  }catch(e){console.warn('[Firebase channels]',e.message);if(showToast)toast('Event channel load failed: '+e.message,'w');return 0;}
+}
 
 // ═══ SCHEDULER ═══
 const schedLogs=[];
@@ -2615,6 +2652,7 @@ async function buildRaceArticleBody(race){
 // ═══ INIT ═══
 document.addEventListener('DOMContentLoaded',()=>{
   loadAll();renderAll();
+  loadFirebaseChannels(false);
   if(fullRacesData.length)renderFullRaces(fullRacesData);
   if(CFG.schedEnabled){document.getElementById('sched-enabled').checked=true;startSched();}
   set('player-base',CFG.playerBase);updateIframeBox();

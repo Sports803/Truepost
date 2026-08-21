@@ -1,0 +1,8 @@
+{
+  "name": "sports803-truepost",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "auto-publish": "node scripts/onetv-autopost.mjs"
+  }
+}

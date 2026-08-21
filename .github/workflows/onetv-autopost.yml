@@ -21,28 +21,39 @@ concurrency:
 jobs:
   autopost:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run OneTV scanner and autoposter
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Event-compatible OneTV autopublisher
         env:
           ONETV_SOURCE_URL: ${{ secrets.ONETV_SOURCE_URL || 'https://oneball.live/' }}
           ONETV_STREAM_BASE_URL: ${{ secrets.ONETV_STREAM_BASE_URL || 'https://hls.live123.fans/live/' }}
           PLAYER_BASE_URL: ${{ secrets.PLAYER_BASE_URL || 'https://sports803.github.io/player/' }}
-          BLOGGER_CLIENT_ID: ${{ secrets.BLOGGER_CLIENT_ID }}
-          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
-          BLOGGER_REFRESH_TOKEN: ${{ secrets.BLOGGER_REFRESH_TOKEN }}
           BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
-          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          IMGBB_KEY: ${{ secrets.IMGBB_KEY }}
+          SPORTMONKS_API_TOKEN: ${{ secrets.SPORTMONKS_API_TOKEN }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL || 'https://sports-803-1b806-default-rtdb.firebaseio.com' }}
           FIREBASE_EVENTS_PATH: ${{ secrets.FIREBASE_EVENTS_PATH || 's803config/todaysMatches' }}
+          AUTOMATION_BLOGGER_POSTS_PATH: ${{ secrets.AUTOMATION_BLOGGER_POSTS_PATH || 'automation/bloggerPosts' }}
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           FIREBASE_AUTH_TOKEN: ${{ secrets.FIREBASE_AUTH_TOKEN }}
-          AUTOPOST_BATCH_LIMIT: ${{ inputs.batch_limit || vars.AUTOPOST_BATCH_LIMIT || '10' }}
-        run: node scripts/onetv-autopost.mjs
+          FIREBASE_PUBLIC_WRITE: 'false'
+          MAX_POSTS_PER_RUN: ${{ inputs.batch_limit || vars.MAX_POSTS_PER_RUN || '10' }}
+          EVENT_WINDOW_HOURS: '24'
+          ACTIVE_GRACE_HOURS: '2'
+        run: npm run auto-publish
 
       - name: Commit posted-ID log
         run: |
