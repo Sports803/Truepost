@@ -1,0 +1,11 @@
+# Local test artifacts
+*.log
+.DS_Store
+node_modules/
+
+# Never commit local secret or environment files
+.env
+.env.*
+
+# Local parser test output
+oneball.html
