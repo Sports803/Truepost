@@ -32,6 +32,10 @@ The OAuth client ID is safe to use in browser-based Google Identity Services, bu
 
 Optional repository secrets or variables include `ONETV_SOURCE_URL`, `ONETV_STREAM_BASE_URL`, `PLAYER_BASE_URL`, `FIREBASE_EVENTS_PATH`, `AUTOMATION_BLOGGER_POSTS_PATH`, and `MAX_POSTS_PER_RUN`. The workflow defaults to the reference Event paths and a batch limit of ten.
 
+## Posting templates
+
+The Compose Article Body now includes the full Event-style template system. Static one-click templates include **Match Preview**, **How To Watch**, **FAQ (SEO)**, **Stream CTA**, and **Highlights Recap**. Rich section controls include **Match Overview**, **Match Details**, **Team Form**, **Head-to-Head**, **Key Players**, **Match Analysis**, **Live Match Events**, **Full-Time Result**, **Detailed Recap**, **Match Statistics**, **What This Result Means**, and **Related Articles**. **Fetch Live Score & Goals (ESPN)** refreshes the current fixture context, while **Auto-fill All Sections** inserts the complete rich-section sequence into the `post-body` editor. Unsupported leagues and pre-kickoff fixtures receive safe general wording instead of failing.
+
 ## Static deployment
 
 `.github/workflows/pages.yml` deploys the static dashboard to GitHub Pages when enabled for the repository. The repository does not require a build step.

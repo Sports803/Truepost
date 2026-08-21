@@ -148,6 +148,10 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
 .sdot.done{background:var(--green)}
 .inj-btn{display:flex;align-items:center;gap:9px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:.13s;text-align:left;width:100%;margin-bottom:6px}
 .inj-btn:hover{border-color:var(--border2);background:var(--bg4)}
+.tpl-btn-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tpl-btn{background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:.72rem;padding:8px 10px;transition:.13s}
+.tpl-btn:hover{background:var(--bg4);border-color:var(--blue);color:#fff}
+.template-status{color:var(--muted2);font-size:.72rem;line-height:1.45;margin:8px 0 10px}
 .inj-icon{font-size:1.1rem;width:26px;text-align:center;flex-shrink:0}
 .inj-title{font-family:var(--cond);font-weight:800;font-size:.78rem;color:var(--text);text-transform:uppercase;letter-spacing:.3px}
 .inj-desc{font-size:.64rem;color:var(--muted2);margin-top:1px}
@@ -360,7 +364,36 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
             <div><div style="font-size:.62rem;color:var(--muted2);margin-bottom:2px">Labels</div><div class="seo-bar"><div class="seo-fill" id="seo-l-bar" style="width:0%;background:var(--orange)"></div></div><div class="seo-score" id="seo-l-score">0</div></div>
           </div>
         </div>
-        <div class="form-group"><label>Post Body</label><textarea id="post-body" rows="14" placeholder="Article content… or click 🤖 AI Write to generate with Claude AI" oninput="updateSEO()"></textarea></div>
+        <div class="form-group">
+          <label style="font-size:1.15rem">ARTICLE BODY</label>
+          <button class="btn-secondary" onclick="Compose.fetchLiveStats()">⚡ Fetch Live Score &amp; Goals (ESPN)</button>
+          <button class="btn-secondary" onclick="Compose.fillAllSections()" style="margin-left:6px">🤖 Auto-fill All Sections</button>
+          <p class="template-status" id="post-template-status">Optional — fetches score and goal scorers for head-to-head team sports. Auto-fill inserts every data-backed section in one pass.</p>
+          <div class="tpl-btn-row">
+            <button class="tpl-btn" onclick="Compose.insertSection('overview')">+ Match Overview</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('details')">+ Match Details</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('form')">+ Team Form</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('h2h')">+ Head-to-Head</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('keyPlayers')">+ Key Players</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('analysis')">+ Match Analysis</button>
+          </div>
+          <div class="tpl-btn-row">
+            <button class="tpl-btn" onclick="Compose.insertSection('liveEvents')">+ Live Match Events</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('result')">+ Full-Time Result</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('recap')">+ Detailed Recap</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('stats')">+ Match Statistics</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('implications')">+ What This Result Means</button>
+            <button class="tpl-btn" onclick="Compose.insertSection('related')">+ Related Articles</button>
+          </div>
+          <div class="tpl-btn-row">
+            <button class="tpl-btn" onclick="Compose.insertTemplate('preview')">+ Match Preview</button>
+            <button class="tpl-btn" onclick="Compose.insertTemplate('howtowatch')">+ How To Watch</button>
+            <button class="tpl-btn" onclick="Compose.insertTemplate('faq')">+ FAQ (SEO)</button>
+            <button class="tpl-btn" onclick="Compose.insertTemplate('cta')">+ Stream CTA</button>
+            <button class="tpl-btn" onclick="Compose.insertTemplate('highlights')">+ Highlights Recap</button>
+          </div>
+          <textarea id="post-body" rows="14" placeholder="Write or insert a template above…" oninput="updateSEO()"></textarea>
+        </div>
         <div class="form-row">
           <div><label>Labels</label><input type="text" id="post-labels" value="sports 803,live " oninput="updateSEO()"></div>
           <div><label>Status</label><select id="post-status"><option value="DRAFT">Draft</option><option value="LIVE">Live</option></select></div>
@@ -411,18 +444,8 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
         </div>
       </div>
       <div class="card">
-        <div class="card-title">⚡ Content Blocks</div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">
-          <button class="btn-ghost btn-xs" onclick="injectHeader('h2','Match Preview')">H2 Preview</button>
-          <button class="btn-ghost btn-xs" onclick="injectHeader('h2','How to Watch')">H2 Watch</button>
-          <button class="btn-ghost btn-xs" onclick="injectHeader('h2','Head-to-Head')">H2 H2H</button>
-          <button class="btn-ghost btn-xs" onclick="injectHeader('h2','Predicted Lineups')">H2 Lineups</button>
-        </div>
-        <button class="inj-btn" onclick="injectBlock('full')"><span class="inj-icon">🤖</span><div><div class="inj-title">Full AI Article (Claude AI)</div><div class="inj-desc">Long-form match preview — uses Claude API if configured, fallback template otherwise</div></div></button>
-        <button class="inj-btn" onclick="injectBlock('cta')"><span class="inj-icon">📺</span><div><div class="inj-title">CTA Stream Block</div><div class="inj-desc">HD streaming call-to-action banner</div></div></button>
-        <button class="inj-btn" onclick="injectBlock('faq')"><span class="inj-icon">❓</span><div><div class="inj-title">FAQ Block (Schema)</div><div class="inj-desc">SEO-friendly Q&amp;A markup</div></div></button>
-        <button class="inj-btn" onclick="injectBlock('stats')"><span class="inj-icon">📊</span><div><div class="inj-title">Stats Table</div><div class="inj-desc">Tactical prediction table</div></div></button>
-        <button class="inj-btn" onclick="injectBlock('h2h')"><span class="inj-icon">⚔️</span><div><div class="inj-title">H2H Record</div><div class="inj-desc">Head-to-head historical block</div></div></button>
+        <div class="card-title">⚡ Content Block Guide</div>
+        <p style="font-size:.72rem;color:var(--muted2);line-height:1.5;margin:0">Use the complete Event-compatible template controls in the Article Body above. Static templates are ready immediately; ESPN-backed sections can be refreshed before insertion, and Auto-fill inserts all rich sections in the Event order.</p>
       </div>
     </div>
     <div class="thumb-studio">
@@ -3059,5 +3082,6 @@ document.addEventListener('input',e=>{
 })();
 
 </script>
+<script src="scripts/posting-templates.js"></script>
 </body>
 </html>
