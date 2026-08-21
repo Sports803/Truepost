@@ -10,6 +10,7 @@
 :root{--bg:#07080c;--bg2:#0c1018;--bg3:#121824;--bg4:#1a2235;--border:#1c2840;--border2:#263550;--red:#e63946;--red2:#c1121f;--blue:#4cc9f0;--green:#06d6a0;--gold:#ffd60a;--orange:#f4a261;--purple:#7209b7;--text:#e2e8f4;--muted:#4a5a72;--muted2:#7a8ea8;--font:'Barlow',sans-serif;--cond:'Barlow Condensed',sans-serif;--mono:'JetBrains Mono',monospace;--r:10px;--r2:14px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;overflow-x:hidden}
+body.mobile-menu-open{overflow:hidden}
 body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.008) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.008) 40px);pointer-events:none;z-index:0}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 input,select,textarea{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 11px;font-size:13px;width:100%;outline:none;font-family:var(--font);transition:border-color .18s,box-shadow .18s}
@@ -37,8 +38,23 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
 .nav-pill.active{background:var(--red);color:#fff;box-shadow:0 2px 8px rgba(230,57,70,.4)}
 .nav-pill:hover:not(.active){color:var(--text);background:var(--bg4)}
 .topbar-right{display:flex;align-items:center;gap:8px}
-#auth-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block}
-#auth-dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+#auth-dot,.auth-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0}
+#auth-dot.on,.auth-dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.mobile-menu-toggle{display:none;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:8px;font-size:1rem;line-height:1}
+.mobile-menu-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.68);backdrop-filter:blur(3px);z-index:390}
+.mobile-drawer{display:none;position:fixed;top:0;right:0;width:min(88vw,360px);height:100dvh;background:linear-gradient(180deg,#111827,#0b1020);border-left:1px solid var(--border2);box-shadow:-18px 0 48px rgba(0,0,0,.65);padding:18px 14px;z-index:400;overflow-y:auto;transform:translateX(105%);transition:transform .22s ease}
+.mobile-drawer.open{transform:translateX(0)}
+.mobile-menu-backdrop.open{display:block}
+.mobile-menu-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px 14px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.mobile-menu-title{font-family:var(--cond);font-size:1.2rem;font-weight:900;text-transform:uppercase;color:var(--text);letter-spacing:.8px}
+.mobile-menu-close{background:transparent;color:var(--muted2);font-size:1.3rem;padding:4px 8px}
+.mobile-nav-list{display:grid;gap:6px}
+.mobile-nav-pill{width:100%;text-align:left;background:var(--bg3);border:1px solid var(--border);color:var(--muted2);padding:12px 13px;font-size:.9rem;border-radius:8px}
+.mobile-nav-pill.active{background:rgba(230,57,70,.16);border-color:var(--red);color:#fff}
+.mobile-auth{display:flex;align-items:center;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+.mobile-auth-copy{flex:1;min-width:0}.mobile-auth-label{display:block;font-size:.68rem;color:var(--muted2);font-family:var(--cond);text-transform:uppercase;letter-spacing:.5px}
+.mobile-auth-status{display:block;font-size:.78rem;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mobile-auth .btn-red{flex-shrink:0}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -173,6 +189,30 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
 .deepseek-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(114,9,183,.15);border:1px solid rgba(114,9,183,.3);border-radius:12px;font-size:.62rem;font-family:var(--cond);font-weight:800;color:#b47ffa;letter-spacing:.4px}
 .sched-time-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(255,214,10,.08);border:1px solid rgba(255,214,10,.25);border-radius:5px;font-size:.65rem;font-family:var(--cond);font-weight:800;color:var(--gold)}
 @media(max-width:1000px){.compose-layout{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr}.dash-grid{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}}
+@media(max-width:700px){
+  body{font-size:14px}
+  .topbar{height:58px;padding:0 12px;gap:8px}
+  .logo{font-size:1.12rem;gap:6px;min-width:0;flex:1}
+  .logo-ver{display:none}
+  .topbar-center,.topbar-right{display:none}
+  .mobile-menu-toggle{display:inline-flex;align-items:center;justify-content:center}
+  .mobile-drawer{display:block}
+  .main{padding:12px}
+  .card{padding:13px;border-radius:12px}
+  .stats-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:14px}
+  .stat-box{padding:11px 7px}
+  .stat-box .n{font-size:1.55rem}
+  .nav-pills{display:none}
+  .events-grid{grid-template-columns:1fr}
+  .live-tv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tpl-btn-row{gap:5px}
+  .tpl-btn{flex:1 1 calc(50% - 5px);min-width:0;font-size:.68rem;padding:8px 7px}
+  .form-row,.form-row.col3{grid-template-columns:1fr}
+  .table-wrap,.ch-table,.log-table{display:block;overflow-x:auto;max-width:100%}
+  .modal{max-height:92dvh;padding:16px}
+  .toast{right:12px;bottom:12px;max-width:calc(100vw - 24px)}
+}
+@media(min-width:701px){.mobile-drawer,.mobile-menu-backdrop{display:none!important}}
 .race-card{background:linear-gradient(145deg,var(--bg2),var(--bg3));border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;transition:.18s}
 .race-card:hover{border-color:var(--orange);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.5)}
 .race-card-img{width:100%;height:148px;object-fit:cover;display:block;background:var(--bg4)}
@@ -202,6 +242,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
     Sports <span style="color:#fff">803</span>
     <span class="logo-ver">v8 · Claude AI + Highlights</span>
   </div>
+  <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Open navigation menu" aria-expanded="false" onclick="toggleMobileMenu()">☰</button>
   <div class="topbar-center">
     <div class="nav-pills">
       <button class="nav-pill active" onclick="showPage('dashboard')">🏠 Dashboard</button>
@@ -221,6 +262,22 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
     <button class="btn-red btn-sm" id="auth-btn" onclick="handleAuth()">Sign in</button>
   </div>
 </div>
+<div class="mobile-menu-backdrop" id="mobile-menu-backdrop" onclick="closeMobileMenu()"></div>
+<aside class="mobile-drawer" id="mobile-drawer" aria-label="Mobile navigation">
+  <div class="mobile-menu-head"><div class="mobile-menu-title">Sports 803 Menu</div><button class="mobile-menu-close" aria-label="Close navigation menu" onclick="closeMobileMenu()">✕</button></div>
+  <nav class="mobile-nav-list" aria-label="Dashboard sections">
+    <button class="mobile-nav-pill active" data-mobile-page="dashboard" onclick="showPage('dashboard')">🏠 Dashboard</button>
+    <button class="mobile-nav-pill" data-mobile-page="events" onclick="showPage('events')">📅 Events</button>
+    <button class="mobile-nav-pill" data-mobile-page="fullraces" onclick="showPage('fullraces')">🏁 Full Race Replays</button>
+    <button class="mobile-nav-pill" data-mobile-page="compose" onclick="showPage('compose')">✍️ Compose Post</button>
+    <button class="mobile-nav-pill" data-mobile-page="thumbbuilder" onclick="showPage('thumbbuilder')">🖼️ Thumbnails</button>
+    <button class="mobile-nav-pill" data-mobile-page="channels" onclick="showPage('channels')">📺 Channels / Live TV</button>
+    <button class="mobile-nav-pill" data-mobile-page="scheduler" onclick="showPage('scheduler')">⏰ Scheduler</button>
+    <button class="mobile-nav-pill" data-mobile-page="postlog" onclick="showPage('postlog')">📋 Post Log</button>
+    <button class="mobile-nav-pill" data-mobile-page="settings" onclick="showPage('settings')">⚙️ Settings</button>
+  </nav>
+  <div class="mobile-auth"><span id="mobile-auth-dot" class="auth-dot"></span><div class="mobile-auth-copy"><span class="mobile-auth-label">Blogger / Google</span><span id="mobile-auth-label" class="mobile-auth-status">Not signed in</span></div><button class="btn-red btn-sm" id="mobile-auth-btn" onclick="handleAuth();closeMobileMenu()">Sign in</button></div>
+</aside>
 
 <div class="main">
 
@@ -1778,10 +1835,10 @@ function insertIframe(){const urls=getMoraURLs();if(!urls.length){toast('Add at 
 // ═══ BLOGGER AUTH ═══
 function handleAuth(){
   if(accessToken){signOut();return;}CFG.clientId=CFG.clientId||EVENT_BUILTIN_CLIENT_ID;if(!CFG.clientId){toast('Enter OAuth Client ID in Settings','e');return;}
-  const client=google.accounts.oauth2.initTokenClient({client_id:CFG.clientId,scope:'https://www.googleapis.com/auth/blogger',callback:r=>{if(r.error){toast('Auth error: '+r.error,'e');return;}accessToken=r.access_token;document.getElementById('auth-dot').className='on';document.getElementById('auth-label').textContent='Signed in';document.getElementById('auth-label').style.color='var(--green)';document.getElementById('auth-btn').textContent='Sign out';toast('Signed in ✓','s');}});
+  const client=google.accounts.oauth2.initTokenClient({client_id:CFG.clientId,scope:'https://www.googleapis.com/auth/blogger',callback:r=>{if(r.error){toast('Auth error: '+r.error,'e');return;}accessToken=r.access_token;document.getElementById('auth-dot').className='on';document.getElementById('auth-label').textContent='Signed in';document.getElementById('auth-label').style.color='var(--green)';document.getElementById('auth-btn').textContent='Sign out';syncMobileAuth();toast('Signed in ✓','s');}});
   client.requestAccessToken();
 }
-function signOut(){if(accessToken)try{google.accounts.oauth2.revoke(accessToken,()=>{});}catch(e){}accessToken=null;document.getElementById('auth-dot').className='';document.getElementById('auth-label').textContent='Not signed in';document.getElementById('auth-label').style.color='var(--muted)';document.getElementById('auth-btn').textContent='Sign in';toast('Signed out','i');}
+function signOut(){if(accessToken)try{google.accounts.oauth2.revoke(accessToken,()=>{});}catch(e){}accessToken=null;document.getElementById('auth-dot').className='';document.getElementById('auth-label').textContent='Not signed in';document.getElementById('auth-label').style.color='var(--muted)';document.getElementById('auth-btn').textContent='Sign in';syncMobileAuth();closeMobileMenu();toast('Signed out','i');}
 async function postToBlogger(){
   if(!accessToken){toast('Sign in first','e');return;}if(!CFG.blogId){toast('Enter Blog ID in Settings','e');return;}
   const t=v('post-title'),b=document.getElementById('post-body').value.trim(),st=v('post-status');
@@ -2090,11 +2147,17 @@ function updateStats(){document.getElementById('st-events').textContent=allEvent
 function renderAll(){renderChannels();renderLeagueToggles();renderPostLog();renderLeagueFilterPills();updateStats();}
 
 // ═══ NAVIGATION ═══
+function toggleMobileMenu(){const drawer=document.getElementById('mobile-drawer');const backdrop=document.getElementById('mobile-menu-backdrop');const toggle=document.getElementById('mobile-menu-toggle');if(!drawer)return;const open=!drawer.classList.contains('open');drawer.classList.toggle('open',open);backdrop?.classList.toggle('open',open);document.body.classList.toggle('mobile-menu-open',open);toggle?.setAttribute('aria-expanded',String(open));if(open)syncMobileAuth();}
+function closeMobileMenu(){const drawer=document.getElementById('mobile-drawer');const backdrop=document.getElementById('mobile-menu-backdrop');const toggle=document.getElementById('mobile-menu-toggle');drawer?.classList.remove('open');backdrop?.classList.remove('open');document.body.classList.remove('mobile-menu-open');toggle?.setAttribute('aria-expanded','false');}
+function syncMobileAuth(){const signed=!!accessToken;const dot=document.getElementById('mobile-auth-dot');const label=document.getElementById('mobile-auth-label');const button=document.getElementById('mobile-auth-btn');dot?.classList.toggle('on',signed);if(label){label.textContent=signed?'Signed in':'Not signed in';label.style.color=signed?'var(--green)':'var(--muted)';}if(button)button.textContent=signed?'Sign out':'Sign in';}
 function showPage(id){
   if(id!=='compose'&&editingPostId)clearEditMode();
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-pill').forEach(b=>b.classList.remove('active'));const page=document.getElementById('page-'+id);if(page)page.classList.add('active');document.querySelectorAll('.nav-pill').forEach(b=>{if(b.getAttribute('onclick')?.includes("'"+id+"'"))b.classList.add('active');});
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-pill').forEach(b=>b.classList.remove('active'));const page=document.getElementById('page-'+id);if(page)page.classList.add('active');document.querySelectorAll('.nav-pill').forEach(b=>{if(b.getAttribute('onclick')?.includes("'"+id+"'"))b.classList.add('active');});document.querySelectorAll('.mobile-nav-pill').forEach(b=>b.classList.toggle('active',b.dataset.mobilePage===id));
   if(id==='fullraces'&&fullRacesData.length)renderFullRaces(fullRacesData);
+  closeMobileMenu();
 }
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMobileMenu();});
+window.addEventListener('resize',()=>{if(window.innerWidth>700)closeMobileMenu();});
 
 // ═══ MODAL + TOAST ═══
 function openModal(id){document.getElementById(id).classList.add('open');}
