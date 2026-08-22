@@ -961,7 +961,8 @@ const ESPN='https://site.api.espn.com/apis/site/v2/sports';
 const TSDB='https://www.thesportsdb.com/api/v1/json/3';
 const CLAUDE_API='https://api.anthropic.com/v1/messages';
 // Public, non-secret defaults shared with Sports803/Event. OAuth secrets stay in GitHub Actions secrets.
-const EVENT_BUILTIN_CLIENT_ID='55046129292-15h9k5ga0lr1e3p3ptqg1iueeks49f7v.apps.googleusercontent.com';
+const EVENT_BUILTIN_CLIENT_ID='548443260529-rad10kv6bh61bqclcl290hh5rmmptve8.apps.googleusercontent.com';
+const LEGACY_EVENT_CLIENT_ID='55046129292-15h9k5ga0lr1e3p3ptqg1iueeks49f7v.apps.googleusercontent.com';
 const EVENT_FIREBASE_DATABASE_URL='https://sports-803-1b806-default-rtdb.firebaseio.com';
 const EVENT_FIREBASE_EVENTS_PATH='s803config/todaysMatches';
 const EVENT_FIREBASE_CHANNELS_PATH='livetv/channels';
@@ -1075,7 +1076,7 @@ function loadAll(){
   try{const p=JSON.parse(localStorage.getItem(SK_FR)||'{}');if(p.data)fullRacesData=p.data;}catch(e){}
   LOGO_OVERRIDES=parseLOOverrides(CFG.logoOverridesRaw);
   ddkanquMappings=parseDDKMappings(CFG.ddkanquMappingsRaw);
-  CFG.clientId=CFG.clientId||EVENT_BUILTIN_CLIENT_ID;
+  if(!CFG.clientId||CFG.clientId===LEGACY_EVENT_CLIENT_ID)CFG.clientId=EVENT_BUILTIN_CLIENT_ID;
   CFG.firebaseDatabaseUrl=CFG.firebaseDatabaseUrl||EVENT_FIREBASE_DATABASE_URL;
   CFG.firebaseEventsPath=CFG.firebaseEventsPath||EVENT_FIREBASE_EVENTS_PATH;
   CFG.firebaseChannelsPath=CFG.firebaseChannelsPath||EVENT_FIREBASE_CHANNELS_PATH;
