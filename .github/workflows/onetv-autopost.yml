@@ -37,6 +37,7 @@ jobs:
         env:
           ONETV_SOURCE_URL: ${{ secrets.ONETV_SOURCE_URL || 'https://oneball.live/' }}
           ONETV_STREAM_BASE_URL: ${{ secrets.ONETV_STREAM_BASE_URL || 'https://hls.live123.fans/live/' }}
+          PPVTV_MATCHES_API: ${{ vars.PPVTV_MATCHES_API || 'https://august.ppvtv.icu/api/matches.json' }}
           PLAYER_BASE_URL: ${{ secrets.PLAYER_BASE_URL || 'https://sports803.github.io/player/' }}
           BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
