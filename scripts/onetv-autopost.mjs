@@ -97,7 +97,7 @@ function pairKey(home,away){return [normalizeTeamName(home),normalizeTeamName(aw
 function buildPlayerUrl(streamUrl,embedUrls=[]){
   const base=PLAYER_BASE_URL.replace(/\/$/,'');
   const params=[];
-  if(streamUrl){const innerPlayer=`${base}/?mora=${encodeURIComponent(streamUrl)}`;params.push(`mora=${encodeURIComponent(innerPlayer)}`);}
+  if(streamUrl)params.push(`mora=${encodeURIComponent(streamUrl)}`);
   for(const url of [...new Set(embedUrls.filter(Boolean))])params.push(`embed=${encodeURIComponent(url)}`);
   return params.length?`${base}/?${params.join('&')}`:'';
 }

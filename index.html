@@ -2242,7 +2242,7 @@ function getPPVTVSourcesForEvent(ev){if(ev.type==='race')return[];return ppvTVHo
 function buildSports803PlayerUrl(sources){
   if(!sources||!sources.length)return'';const base=(CFG.mediaPlayerBase||'https://sports803.github.io/player/').replace(/\/$/,'');
   const mora=sources.find(s=>s.type==='mora'||s.type==='hls');const embeds=sources.filter(s=>s.type==='embed');const params=[];
-  if(mora?.url){const innerPlayer=base+'/?mora='+encodeURIComponent(mora.url);params.push('mora='+encodeURIComponent(innerPlayer));}
+  if(mora?.url)params.push('mora='+encodeURIComponent(mora.url));
   embeds.forEach(s=>{if(s.url)params.push('embed='+encodeURIComponent(s.url));});
   return params.length?base+'/?'+params.join('&'):'';
 }
