@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 
 const SOURCE_URL = process.env.ONETV_SOURCE_URL || 'https://oneball.live/';
+const PPVTV_MATCHES_API = process.env.PPVTV_MATCHES_API || 'https://august.ppvtv.icu/api/matches.json';
 const PLAYER_BASE_URL = process.env.PLAYER_BASE_URL || 'https://sports803.github.io/player/';
 const STREAM_BASE_URL = process.env.ONETV_STREAM_BASE_URL || 'https://hls.live123.fans/live/';
 const BLOGGER_API = 'https://www.googleapis.com/blogger/v3';
@@ -67,7 +68,7 @@ function parseOneTV(html) {
     const league = innerByClass(block, 'league-badge') || attr(opening, 'data-league') || 'OneTV';
     const date = parseDate(attr(opening, 'data-match-time') || attr(opening, 'data-time'));
     const streamUrl = `${STREAM_BASE_URL.replace(/\/$/, '')}/${encodeURIComponent(id)}.m3u8`;
-    const playerUrl = `${PLAYER_BASE_URL.replace(/\/$/, '')}/?mora=${encodeURIComponent(streamUrl)}`;
+    const playerUrl = buildPlayerUrl(streamUrl);
     seen.add(id);
     results.push({
       oneballId: id,
@@ -92,6 +93,17 @@ async function writeLog(log) {
 }
 function normalizeTeamName(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(fc|afc|sc|cf|club|calcio)\b/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');}
 function stableKey(item){return `${normalizeTeamName(item.homeName)}|${normalizeTeamName(item.awayName)}|${new Date(item.date).toISOString().slice(0,16)}`.replace(/[^a-z0-9|:-]+/g,'-');}
+function pairKey(home,away){return [normalizeTeamName(home),normalizeTeamName(away)].sort().join('|');}
+function buildPlayerUrl(streamUrl,embedUrls=[]){
+  const base=PLAYER_BASE_URL.replace(/\/$/,'');
+  const params=[];
+  if(streamUrl){const innerPlayer=`${base}/?mora=${encodeURIComponent(streamUrl)}`;params.push(`mora=${encodeURIComponent(innerPlayer)}`);}
+  for(const url of [...new Set(embedUrls.filter(Boolean))])params.push(`embed=${encodeURIComponent(url)}`);
+  return params.length?`${base}/?${params.join('&')}`:'';
+}
+async function loadPPVTVMatches(){
+  try{const response=await fetch(PPVTV_MATCHES_API,{headers:{'user-agent':'Sports803-Truepost/1.0'},signal:AbortSignal.timeout(15000)});if(!response.ok)throw new Error(`PPVTV ${response.status}`);const payload=await response.json();const map={};for(const match of Array.isArray(payload?.matches)?payload.matches:[]){const home=match?.teams?.home?.name||'',away=match?.teams?.away?.name||'';if(!home||!away)continue;const embeds=[match.embed_url,...(Array.isArray(match.servers)?match.servers.map(server=>server?.embed_url):[])].filter(url=>/^https?:\/\//i.test(String(url||'')));if(embeds.length)map[pairKey(home,away)]=[...new Set([...(map[pairKey(home,away)]||[]),...embeds])];}return map;}catch(error){console.warn(`[PPVTV] ${error.message}`);return {};}
+}
 async function firebaseRequest(path, options={}){
   if(!FIREBASE_DATABASE_URL)return null;
   const token=FIREBASE_PUBLIC_WRITE?'':await firebaseAccessToken();
@@ -160,6 +172,7 @@ async function main() {
   const candidates=parseOneTV(await response.text());
   const log=await readLog();
   const automationLedger=await readAutomationLedger();
+  const ppvTVMatches=await loadPPVTVMatches();
   const pending=candidates.filter(item=>!log[item.oneballId]&&automationLedger[stableKey(item)]?.status!=='posted').slice(0,BATCH_LIMIT);
   console.log(`OneTV scan found ${candidates.length}; ${pending.length} new item(s) selected.`);
   if(!pending.length)return;
@@ -167,8 +180,10 @@ async function main() {
   for(const item of pending){
     const key=stableKey(item);
     try{
-      const post=await postToBlogger(item,bloggerToken);
-      const firebase=await pushToFirebase(item,post);
+      const embedUrls=ppvTVMatches[pairKey(item.homeName,item.awayName)]||[];
+      const publishItem={...item,embedUrls,playerUrl:buildPlayerUrl(item.streamUrl,embedUrls)};
+      const post=await postToBlogger(publishItem,bloggerToken);
+      const firebase=await pushToFirebase(publishItem,post);
       const postedAt=new Date().toISOString();
       log[item.oneballId]={title:`${item.homeName} vs ${item.awayName}`,date:item.date,bloggerPostId:post.id||'',bloggerUrl:post.url||'',firebase:!firebase.skipped,postedAt};
       await writeLog(log);
@@ -185,7 +200,7 @@ if (process.argv[1] && new URL(`file://${process.argv[1]}`).href === import.meta
   main().catch(error => { console.error(error); process.exitCode = 1; });
 }
 
-export { parseOneTV };
+export { parseOneTV, buildPlayerUrl, pairKey, loadPPVTVMatches };
 
 // The workflow imports no packages; this file is intentionally runnable on the stock Node.js runtime.
 // The source URL and stream URL are configurable so the OneTV-compatible endpoint can be changed without editing code.

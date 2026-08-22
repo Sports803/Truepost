@@ -6,7 +6,7 @@ Sports 803 Truepost is a public static sports dashboard based on the supplied `i
 
 Truepost now uses the same public defaults and database paths as [Sports803/Event](https://github.com/Sports803/Event): the shared Google OAuth client ID is prefilled for browser sign-in, the Firebase Realtime Database defaults to `https://sports-803-1b806-default-rtdb.firebaseio.com`, events use `s803config/todaysMatches`, and live channels use `livetv/channels`. The Channels page can load and merge live channel records directly from that Firebase node.
 
-The reference player route is `https://sports803.github.io/player/`. OneTV-compatible match cards are read from `https://oneball.live/`, normalized by team names and kickoff time, and converted into Sports803 player URLs. DDKQAX lookups in the dashboard use `https://www.ddkqax.com`.
+The reference player route is `https://sports803.github.io/player/`. OneTV-compatible match cards are read from `https://oneball.live/`, normalized by team names and kickoff time, and converted into Sports803 player URLs. The optional PPVTV feed is read from `https://august.ppvtv.icu/api/matches.json`; its match-level and server-level `embed_url` values are added as fallback sources. Generated links use one encoded `mora` stream parameter followed by ordered encoded `embed` parameters, for example `https://sports803.github.io/player/?mora=<encoded-stream>&embed=<encoded-fallback-1>&embed=<encoded-fallback-2>`. DDKQAX lookups in the dashboard use `https://www.ddkqax.com`.
 
 ## GitHub Actions autopublishing
 
@@ -30,7 +30,7 @@ The workflow uses Node.js 22 and the same `npm run auto-publish` entry-point con
 
 The OAuth client ID is safe to use in browser-based Google Identity Services, but the client secret, refresh token, Firebase credentials, and ImgBB key must remain GitHub Secrets. They are not copied into this public repository.
 
-Optional repository secrets or variables include `ONETV_SOURCE_URL`, `ONETV_STREAM_BASE_URL`, `PLAYER_BASE_URL`, `FIREBASE_EVENTS_PATH`, `AUTOMATION_BLOGGER_POSTS_PATH`, and `MAX_POSTS_PER_RUN`. The workflow defaults to the reference Event paths and a batch limit of ten.
+Optional repository secrets or variables include `ONETV_SOURCE_URL`, `ONETV_STREAM_BASE_URL`, `PPVTV_MATCHES_API`, `PLAYER_BASE_URL`, `FIREBASE_EVENTS_PATH`, `AUTOMATION_BLOGGER_POSTS_PATH`, and `MAX_POSTS_PER_RUN`. The workflow defaults to the reference Event paths, the PPVTV public feed, and a batch limit of ten.
 
 ## Posting templates
 

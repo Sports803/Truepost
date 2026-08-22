@@ -959,6 +959,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
 const SK_CFG='s803v7_cfg',SK_CH='s803v7_ch',SK_POST='s803v7_post',SK_LOGO='s803v7_logo',SK_DDKC='s803v7_ddkc',SK_FR='s803v7_fr';
 const ESPN='https://site.api.espn.com/apis/site/v2/sports';
 const TSDB='https://www.thesportsdb.com/api/v1/json/3';
+const PPVTV_MATCHES_API='https://august.ppvtv.icu/api/matches.json';
 const CLAUDE_API='https://api.anthropic.com/v1/messages';
 // Public, non-secret defaults shared with Sports803/Event. OAuth secrets stay in GitHub Actions secrets.
 const EVENT_BUILTIN_CLIENT_ID='548443260529-rad10kv6bh61bqclcl290hh5rmmptve8.apps.googleusercontent.com';
@@ -993,7 +994,7 @@ let currentComposeEv=null;
 let currentComposeRace=null; // stores race object when composing from Full Races
 let fullRacesData=[];
 let tbGenCount=0,composeGenCount=0;
-let externalStreamsMap={},ddkanquCache={},ddkanquMappings={},ddkanquHomeMap={},oneTVHomeMap={};
+let externalStreamsMap={},ddkanquCache={},ddkanquMappings={},ddkanquHomeMap={},oneTVHomeMap={},ppvTVHomeMap={};
 let dsArticleCache={};
 
 const ZH_EN_TEAMS={
@@ -2221,6 +2222,7 @@ async function getAllStreamSourcesForEvent(ev){
   if(ev.type==='match'){
     const kfSources=getOneTVSourcesForEvent(ev);
     sources.push(...kfSources);
+    sources.push(...getPPVTVSourcesForEvent(ev));
   }
   if(CFG.autoFetchStreams){
     const ddkSources=await getDdkanquSourcesForEvent(ev);
@@ -2228,6 +2230,21 @@ async function getAllStreamSourcesForEvent(ev){
     sources.push(...getProgTxtStreamsForEvent(ev));
   }
   return sources;
+}
+function parsePPVTVMatches(payload){
+  const map={};const matches=Array.isArray(payload?.matches)?payload.matches:[];
+  matches.forEach(match=>{const home=match?.teams?.home?.name||'',away=match?.teams?.away?.name||'';if(!home||!away)return;const embeds=[];if(match.embed_url)embeds.push(match.embed_url);(Array.isArray(match.servers)?match.servers:[]).forEach(server=>{if(server?.embed_url)embeds.push(server.embed_url);});const unique=[...new Set(embeds.filter(u=>/^https?:\/\//i.test(u)))];if(!unique.length)return;const key=pairKey(home,away);if(!map[key])map[key]=[];unique.forEach(url=>{if(!map[key].some(s=>s.url===url))map[key].push({url,type:'embed',source:'ppvtv',matchId:String(match.id||''),home,away});});});return map;
+}
+async function loadPPVTVStreams(){
+  try{const res=await fetch(PPVTV_MATCHES_API,{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!res.ok)throw new Error('HTTP '+res.status);ppvTVHomeMap=parsePPVTVMatches(await res.json());const count=Object.keys(ppvTVHomeMap).length;console.log('[PPVTV] Loaded '+count+' match(es)');return count;}catch(e){console.warn('[PPVTV]',e.message);ppvTVHomeMap={};return 0;}
+}
+function getPPVTVSourcesForEvent(ev){if(ev.type==='race')return[];return ppvTVHomeMap[pairKey(ev.home.name,ev.away.name)]||[];}
+function buildSports803PlayerUrl(sources){
+  if(!sources||!sources.length)return'';const base=(CFG.mediaPlayerBase||'https://sports803.github.io/player/').replace(/\/$/,'');
+  const mora=sources.find(s=>s.type==='mora'||s.type==='hls');const embeds=sources.filter(s=>s.type==='embed');const params=[];
+  if(mora?.url){const innerPlayer=base+'/?mora='+encodeURIComponent(mora.url);params.push('mora='+encodeURIComponent(innerPlayer));}
+  embeds.forEach(s=>{if(s.url)params.push('embed='+encodeURIComponent(s.url));});
+  return params.length?base+'/?'+params.join('&'):'';
 }
 async function loadOneTVStreams(){
   const url='https://oneball.live/';
@@ -2250,10 +2267,9 @@ async function loadOneTVStreams(){
         const readLogo=el=>el?.querySelector('.team-logo img,img.team-logo,img[data-team-logo],img')?.getAttribute('src')||el?.getAttribute('data-logo')||'';
         const home=readName(homeEl),away=readName(awayEl);if(!home||!away)return;
         const streamUrl='https://hls.live123.fans/live/'+encodeURIComponent(matchId)+'.m3u8';
-        const playerUrl=(CFG.mediaPlayerBase||'https://sports803.github.io/player/').replace(/\/$/,'')+'?mora='+encodeURIComponent(streamUrl);
         const key=pairKey(home,away);
         if(!oneTVHomeMap[key])oneTVHomeMap[key]=[];
-        if(!oneTVHomeMap[key].some(s=>s.url===playerUrl))oneTVHomeMap[key].push({url:playerUrl,type:'embed',source:'onetv',matchId,home,away,homeLogo:readLogo(homeEl),awayLogo:readLogo(awayEl)});
+        if(!oneTVHomeMap[key].some(s=>s.url===streamUrl))oneTVHomeMap[key].push({url:streamUrl,type:'mora',source:'onetv',matchId,home,away,homeLogo:readLogo(homeEl),awayLogo:readLogo(awayEl)});
       });
       const count=Object.keys(oneTVHomeMap).length;
       console.log('[OneTV] Loaded '+count+' match(es)');
@@ -2267,16 +2283,16 @@ function getOneTVSourcesForEvent(ev){
   const key=pairKey(ev.home.name,ev.away.name);
   return oneTVHomeMap[key]||[];
 }
-function buildMultiSourceIframe(sources){if(!sources||!sources.length)return'';const base=(CFG.mediaPlayerBase||'https://sports803.github.io/player/').replace(/\/$/,'');const params=sources.map(s=>s.type+'='+encodeURIComponent(s.url)).join('&');const src=base+'?'+params;return'<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe loading="lazy" sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" allow="encrypted-media" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" src="'+src+'" frameborder="0" scrolling="no" allowfullscreen></iframe></div>';}
+function buildMultiSourceIframe(sources){const src=buildSports803PlayerUrl(sources);if(!src)return'';return'<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe loading="lazy" sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" allow="encrypted-media" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" src="'+src+'" frameborder="0" scrolling="no" allowfullscreen></iframe></div>';}
 async function refreshAllStreams(){
   if(!CFG.autoFetchStreams){toast('Enable "Auto-fetch External Streams" in Settings first','w');return;}
   updateAggStatus('<span class="spinner"></span> Loading…','i');
-  await Promise.all([loadExternalStreams(),loadDDKanquHome(),CFG.enableOneTV?loadOneTVStreams():Promise.resolve()]);
+  await Promise.all([loadExternalStreams(),loadDDKanquHome(),CFG.enableOneTV?loadOneTVStreams():Promise.resolve(),loadPPVTVStreams()]);
   ddkanquMappings=parseDDKMappings(CFG.ddkanquMappingsRaw);
   const progTotal=Object.keys(externalStreamsMap).length;const homeTotal=Object.keys(ddkanquHomeMap).length;const mTotal=Object.keys(ddkanquMappings).length;
   updateAggStatus('✓ prog.txt: '+progTotal+' · DDKanqu home: '+homeTotal+' · Manual: '+mTotal,'s');
   const el=document.getElementById('streams-status');if(el)el.textContent='Updated '+new Date().toLocaleTimeString();
-  const oneTVTotal=Object.keys(oneTVHomeMap).length;const badge=document.getElementById('agg-prog-badge');if(badge)badge.textContent='prog.txt: '+progTotal+' · DDK: '+homeTotal+(oneTVTotal?' · OneTV: '+oneTVTotal:'');
+  const oneTVTotal=Object.keys(oneTVHomeMap).length;const ppvTotal=Object.keys(ppvTVHomeMap).length;const badge=document.getElementById('agg-prog-badge');if(badge)badge.textContent='prog.txt: '+progTotal+' · DDK: '+homeTotal+(oneTVTotal?' · OneTV: '+oneTVTotal:'')+(ppvTotal?' · PPVTV: '+ppvTotal:'');
   persistLogoCache();toast('Streams refreshed ✓','s');
 }
 function updateAggStatus(html,type='i'){const el=document.getElementById('agg-status');if(!el)return;const colors={s:'var(--green)',e:'var(--red)',i:'var(--muted2)',w:'var(--orange)'};el.style.color=colors[type]||'var(--muted2)';el.innerHTML=html;}
@@ -2750,11 +2766,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     ddkanquMappings=parseDDKMappings(CFG.ddkanquMappingsRaw);
     const loaders=[];
     if(CFG.autoFetchStreams){loaders.push(loadExternalStreams().catch(e=>console.warn('[Streams]',e.message)));loaders.push(loadDDKanquHome().catch(e=>console.warn('[DDKanqu]',e.message)));}
-    if(CFG.enableOneTV){loaders.push(loadOneTVStreams().catch(e=>console.warn('[OneTV]',e.message)));}
+      if(CFG.enableOneTV){loaders.push(loadOneTVStreams().catch(e=>console.warn('[OneTV]',e.message)));}
+      loaders.push(loadPPVTVStreams().catch(e=>console.warn('[PPVTV]',e.message)));
     Promise.all(loaders).then(()=>{
       const oneTVTotal=Object.keys(oneTVHomeMap).length;
       const badge=document.getElementById('agg-prog-badge');
-      if(badge)badge.textContent='prog.txt: '+Object.keys(externalStreamsMap).length+' · DDK: '+Object.keys(ddkanquHomeMap).length+(oneTVTotal?' · OneTV: '+oneTVTotal:'');
+      if(badge)badge.textContent='prog.txt: '+Object.keys(externalStreamsMap).length+' · DDK: '+Object.keys(ddkanquHomeMap).length+(oneTVTotal?' · OneTV: '+oneTVTotal:'')+(Object.keys(ppvTVHomeMap).length?' · PPVTV: '+Object.keys(ppvTVHomeMap).length:'');
       persistLogoCache();
     });
   }
