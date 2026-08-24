@@ -2197,14 +2197,14 @@ async function loadExternalStreams(){
   updateAggStatus('✓ prog.txt: '+total+' entries loaded','s');
 }
 function parseDDKMappings(raw){const out={};(raw||'').split('\n').forEach(line=>{const eq=line.indexOf('=');if(eq<0)return;const lhs=line.substring(0,eq).trim();const rhs=line.substring(eq+1).trim();if(!lhs||!rhs)return;const sep=lhs.match(/ (vs\.?|x|–|-) /i);let key;if(sep){const idx=lhs.toLowerCase().indexOf(sep[0].toLowerCase());const a=lhs.substring(0,idx).trim(),b=lhs.substring(idx+sep[0].length).trim();key=pairKey(a,b);}else key=lhs.toLowerCase().trim();out[key]=rhs;});return out;}
-function ddkUrl(idOrUrl){if(!idOrUrl)return null;if(idOrUrl.startsWith('http'))return idOrUrl;return'https://www.ddkqax.com/zhibo/'+idOrUrl+'.html';}
+function ddkUrl(idOrUrl){if(!idOrUrl)return null;if(idOrUrl.startsWith('http'))return idOrUrl;return'https://ddkaqiu.com/zhibo/'+idOrUrl+'.html';}
 async function scrapeDDKanqu(home,away){
-  const q=encodeURIComponent(home+' '+away);const searchUrl='https://didiaokanqiu.net/search?keyword='+q;const proxies=['https://corsproxy.io/?'+encodeURIComponent(searchUrl),'https://api.allorigins.win/raw?url='+encodeURIComponent(searchUrl)];
-  for(const proxy of proxies){try{const res=await fetch(proxy,{signal:AbortSignal.timeout(8000)});if(!res.ok)continue;const html=await res.text();const m=html.match(/href=["']?(\/zhibo\/(\d+)\.html)["']?/);if(m){const fullUrl='https://didiaokanqiu.net'+m[1];return fullUrl;}}catch(e){console.warn('[DDK]',e.message);}}
+  const q=encodeURIComponent(home+' '+away);const searchUrl='https://ddkaqiu.com/search?keyword='+q;const proxies=['https://corsproxy.io/?'+encodeURIComponent(searchUrl),'https://api.allorigins.win/raw?url='+encodeURIComponent(searchUrl)];
+  for(const proxy of proxies){try{const res=await fetch(proxy,{signal:AbortSignal.timeout(8000)});if(!res.ok)continue;const html=await res.text();const m=html.match(/href=["']?(\/zhibo\/(\d+)\.html)["']?/);if(m){const fullUrl='https://ddkaqiu.com'+m[1];return fullUrl;}}catch(e){console.warn('[DDK]',e.message);}}
   return null;
 }
 async function loadDDKanquHome(){
-  const url='https://didiaokanqiu.net/';const proxies=['https://corsproxy.io/?'+encodeURIComponent(url),'https://api.allorigins.win/raw?url='+encodeURIComponent(url)];
+  const url='https://ddkaqiu.com/';const proxies=['https://corsproxy.io/?'+encodeURIComponent(url),'https://api.allorigins.win/raw?url='+encodeURIComponent(url)];
   for(const proxy of proxies){try{const res=await fetch(proxy,{signal:AbortSignal.timeout(12000)});if(!res.ok)continue;const html=await res.text();ddkanquHomeMap=parseDDKanquHome(html);const count=Object.keys(ddkanquHomeMap).length;console.log('[DDKanqu] Homepage parsed: '+count+' match(es)');return count;}catch(e){console.warn('[DDKanqu] Home fetch via',proxy,'→',e.message);}}
   return 0;
 }
@@ -2214,7 +2214,7 @@ function parseDDKanquHome(html){
     const zhiBoPath=m[1];const inner=m[2];
     const homeM=inner.match(/class="left-team">([^<]+)<\/span>/);const awayM=inner.match(/class="right-team">([^<]+)<\/span>/);if(!homeM||!awayM)continue;
     const zhHome=homeM[1].trim();const zhAway=awayM[1].trim();
-    const zhibo='https://didiaokanqiu.net'+zhiBoPath;const enHome=zhToEn(zhHome);const enAway=zhToEn(zhAway);const key=pairKey(enHome,enAway);
+    const zhibo='https://ddkaqiu.com'+zhiBoPath;const enHome=zhToEn(zhHome);const enAway=zhToEn(zhAway);const key=pairKey(enHome,enAway);
     if(!map[key])map[key]={zhibo,hls:null,zhHome,zhAway,enHome,enAway};
   }
   return map;
@@ -2558,7 +2558,7 @@ function buildRacePlayerIframe(race){
   const playerBase=(CFG.mediaPlayerBase||CFG.playerBase||'https://sports803.github.io/player/').replace(/\/$/,'');
   const params=race.sources.map(s=>{
     // DDKanqu links use mora=, everything else uses embed=
-    const type=s.url.includes('www.ddkqax.com')?'mora':'embed';
+    const type=(s.url.includes('ddkaqiu.com')||s.url.includes('www.ddkqax.com'))?'mora':'embed';
     return type+'='+encodeURIComponent(s.url);
   }).join('&');
   const src=playerBase+'?'+params;
