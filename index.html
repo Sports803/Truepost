@@ -296,9 +296,8 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
     <div class="stat-box"><div class="n" id="st-events">0</div><div class="l">Events</div></div>
     <div class="stat-box"><div class="n" id="st-posted">0</div><div class="l">Posted</div></div>
     <div class="stat-box"><div class="n" id="st-thumbs">0</div><div class="l">Thumbs</div></div>
-    <div class="stat-box"><div class="n" id="st-sched">0</div><div class="l">Queued</div></div>
-    <div class="stat-box"><div class="n" id="st-leagues">0</div><div class="l">Leagues</div></div>
     <div class="stat-box"><div class="n" id="st-hl">0</div><div class="l">Highlights</div></div>
+    <div class="stat-box"><div class="n" id="st-leagues">0</div><div class="l">Leagues</div></div>
   </div>
   <div class="dash-grid">
     <div class="card">
@@ -326,7 +325,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
     </div>
     <div class="card">
       <div class="card-title">📡 Stream Aggregator
-        <span class="ct-right"><span id="agg-prog-badge" style="font-size:.6rem;color:var(--muted2);font-family:var(--mono)">prog.txt: —</span></span>
+        <span class="ct-right"><span id="agg-prog-badge" style="font-size:.6rem;color:var(--muted2);font-family:var(--mono)">OneTV: —</span></span>
       </div>
       <div id="agg-status" style="font-size:.76rem;color:var(--muted2)">Enable in Settings → Stream Aggregator.</div>
       <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
@@ -495,8 +494,8 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
           <div class="iframe-code" id="highlights-player-code">Add a highlights URL above…</div>
         </div>
         <div style="display:flex;gap:6px;margin-top:7px">
-          <button class="btn-gold btn-sm" onclick="ytSearchAndFill(null)">🔍 YT Search</button>
-<button class="btn-orange btn-sm" onclick="insertHighlightsPlayer()">🎬 Insert Highlights Player</button>
+          <button class="btn-gold btn-sm" onclick="oneBallSearchAndFill(null)">🔍 OneBall Replay</button>
+          <button class="btn-orange btn-sm" onclick="insertHighlightsPlayer()">🎬 Insert Highlights Player</button>
 <button class="btn-ghost btn-sm" onclick="copyHighlightsPlayerCode()">📋 Copy Code</button>
         </div>
       </div>
@@ -860,7 +859,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
         <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap">
           <button class="btn-red btn-sm" onclick="saveCFG()">💾 Save Settings</button>
           <button class="btn-blue btn-sm" onclick="openDDKanquTester()">🔍 Test Match Lookup</button>
-          <span id="prog-txt-count" style="align-self:center;font-size:.68rem;color:var(--muted2);font-family:var(--mono)"></span>
+          <span id="ddkanqu-count" style="align-self:center;font-size:.68rem;color:var(--muted2);font-family:var(--mono)"></span>
         </div>
       </div>
     </div>
@@ -937,7 +936,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
     <div class="form-group"><label>Highlights Video URL / Embed</label><input type="text" id="hl-video"></div>
     <div class="form-group"><label>Highlights Body</label><textarea id="hl-body" rows="7"></textarea></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
-      <button class="btn-gold btn-sm" onclick="ytSearchForModal()">🔍 YT Search</button>
+      <button class="btn-gold btn-sm" onclick="oneBallSearchForModal()">🔍 OneBall Replay</button>
       <button class="btn-purple btn-sm" onclick="genHLText()">🤖 AI Generate</button>
       <button class="btn-red btn-sm" onclick="postHighlights()">📤 Post / Update</button>
       <button class="btn-ghost btn-sm" onclick="closeModal('modal-hl')">Cancel</button>
@@ -981,7 +980,6 @@ let CFG={
   schedTiming:60,schedStatus:'DRAFT',schedInterval:300000,
   schedEnabled:false,schedThumbs:true,logoOverridesRaw:'',
   mediaPlayerBase:'https://sports803.github.io/player/',
-    // progTxtUrl removed,
   ppvtvMatchesApi:'https://august.ppvtv.icu/api/matches.json',
   firebaseDatabaseUrl:EVENT_FIREBASE_DATABASE_URL,
   firebaseEventsPath:EVENT_FIREBASE_EVENTS_PATH,
@@ -2182,20 +2180,7 @@ function toast(msg,type='i'){const t=document.createElement('div');t.className='
 // ═══ STREAM AGGREGATOR ═══
 function normTeam(name){return(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(fc|afc|rfc|sc|cf|ac|as|bsc|rcd|rgb|vfb|vfl|1\.fc)\b/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();}
 function pairKey(a,b){return[normTeam(a),normTeam(b)].sort().join('|');}
-function parseProgTxt(text){
-  const map={};const lines=(text||'').split('\n');
-  for(const line of lines){const trimmed=line.trim();if(!trimmed||trimmed.startsWith('#')||!trimmed.includes('|'))continue;const parts=trimmed.split('|').map(p=>p.trim()).filter(Boolean);if(parts.length<2)continue;let matchStr=parts[0].replace(/^\d{1,2}:\d{2}\s+/,'').replace(/\s*(W)\s*$/i,'').trim();const urls=parts.slice(1).filter(u=>u.startsWith('http'));if(!urls.length)continue;const sep=matchStr.match(/ (x|vs\.?|–|-) /i);if(!sep)continue;const idx=matchStr.toLowerCase().indexOf(sep[0].toLowerCase());const teamA=matchStr.substring(0,idx).trim();const teamB=matchStr.substring(idx+sep[0].length).trim();if(!teamA||!teamB)continue;const key=pairKey(teamA,teamB);if(!map[key])map[key]=[];for(const u of urls)map[key].push({url:u,type:'embed'});}
-  return map;
-}
-async function loadExternalStreams(){
-  const url=CFG.progTxtUrl||'https://sportsonline.st/prog.txt';const proxyUrl='https://corsproxy.io/?'+encodeURIComponent(url);let text='';
-  for(const src of[url,proxyUrl]){try{const res=await fetch(src,{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);text=await res.text();if(text.trim())break;}catch(e){console.warn('[Streams]',e.message);}}
-  if(!text.trim()){updateAggStatus('⚠ prog.txt fetch failed','w');return;}
-  externalStreamsMap=parseProgTxt(text);const total=Object.keys(externalStreamsMap).length;
-  const el=document.getElementById('agg-prog-badge');if(el)el.textContent='prog.txt: '+total+' matches';
-  const el2=document.getElementById('prog-txt-count');if(el2)el2.textContent='prog.txt: '+total+' match entries';
-  updateAggStatus('✓ prog.txt: '+total+' entries loaded','s');
-}
+// Prog.txt removed
 function parseDDKMappings(raw){const out={};(raw||'').split('\n').forEach(line=>{const eq=line.indexOf('=');if(eq<0)return;const lhs=line.substring(0,eq).trim();const rhs=line.substring(eq+1).trim();if(!lhs||!rhs)return;const sep=lhs.match(/ (vs\.?|x|–|-) /i);let key;if(sep){const idx=lhs.toLowerCase().indexOf(sep[0].toLowerCase());const a=lhs.substring(0,idx).trim(),b=lhs.substring(idx+sep[0].length).trim();key=pairKey(a,b);}else key=lhs.toLowerCase().trim();out[key]=rhs;});return out;}
 function ddkUrl(idOrUrl){if(!idOrUrl)return null;if(idOrUrl.startsWith('http'))return idOrUrl;return'https://ddkaqiu.com/zhibo/'+idOrUrl+'.html';}
 async function scrapeDDKanqu(home,away){
@@ -2215,6 +2200,7 @@ function parseDDKanquHome(html){
     const homeM=inner.match(/class="left-team">([^<]+)<\/span>/);const awayM=inner.match(/class="right-team">([^<]+)<\/span>/);if(!homeM||!awayM)continue;
     const zhHome=homeM[1].trim();const zhAway=awayM[1].trim();
     const zhibo='https://ddkaqiu.com'+zhiBoPath;const enHome=zhToEn(zhHome);const enAway=zhToEn(zhAway);const key=pairKey(enHome,enAway);
+    // DDKanqu card text often includes teams in <span> tags inside innerHTML
     if(!map[key])map[key]={zhibo,hls:null,zhHome,zhAway,enHome,enAway};
   }
   return map;
@@ -2228,7 +2214,7 @@ async function getDdkanquSourcesForEvent(ev){
   return sources;
 }
 function getChannelsForEvent(ev){return findCHsForLeague(ev.league?.id||'').filter(c=>c.url).map(c=>({url:c.url,type:'mora'}));}
-function getProgTxtStreamsForEvent(ev){if(ev.type==='race')return[];const key=pairKey(ev.home.name,ev.away.name);return externalStreamsMap[key]||[];}
+// getProgTxtStreamsForEvent removed
 async function getAllStreamSourcesForEvent(ev){
   const sources=[...getChannelsForEvent(ev)];
   if(ev.type==='match'){
@@ -2239,7 +2225,6 @@ async function getAllStreamSourcesForEvent(ev){
   if(CFG.autoFetchStreams){
     const ddkSources=await getDdkanquSourcesForEvent(ev);
     sources.push(...ddkSources);
-    sources.push(...getProgTxtStreamsForEvent(ev));
   }
   return sources;
 }
@@ -2307,9 +2292,9 @@ async function refreshAllStreams(){
   await Promise.all(loaders);
   ddkanquMappings=parseDDKMappings(CFG.ddkanquMappingsRaw);
   const progTotal=Object.keys(externalStreamsMap).length;const homeTotal=Object.keys(ddkanquHomeMap).length;const mTotal=Object.keys(ddkanquMappings).length;
-  updateAggStatus('✓ prog.txt: '+progTotal+' · DDKanqu home: '+homeTotal+' · Manual: '+mTotal,'s');
+  updateAggStatus('✓ DDKanqu home: '+homeTotal+' · Manual: '+mTotal,'s');
   const el=document.getElementById('streams-status');if(el)el.textContent='Updated '+new Date().toLocaleTimeString();
-  const oneTVTotal=Object.keys(oneTVHomeMap).length;const ppvTotal=Object.keys(ppvTVHomeMap).length;const badge=document.getElementById('agg-prog-badge');if(badge)badge.textContent='prog.txt: '+progTotal+' · DDK: '+homeTotal+(oneTVTotal?' · OneTV: '+oneTVTotal:'')+(ppvTotal?' · PPVTV: '+ppvTotal:'');
+  const oneTVTotal=Object.keys(oneTVHomeMap).length;const ppvTotal=Object.keys(ppvTVHomeMap).length;const badge=document.getElementById('agg-prog-badge');if(badge)badge.textContent='DDK: '+homeTotal+(oneTVTotal?' · OneTV: '+oneTVTotal:'')+(ppvTotal?' · PPVTV: '+ppvTotal:'');
   persistLogoCache();toast('Streams refreshed ✓','s');
 }
 function updateAggStatus(html,type='i'){const el=document.getElementById('agg-status');if(!el)return;const colors={s:'var(--green)',e:'var(--red)',i:'var(--muted2)',w:'var(--orange)'};el.style.color=colors[type]||'var(--muted2)';el.innerHTML=html;}
@@ -2785,10 +2770,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(CFG.autoFetchStreams){loaders.push(loadDDKanquHome().catch(e=>console.warn('[DDKanqu]',e.message)));}
       if(CFG.enableOneTV){loaders.push(loadOneTVStreams().catch(e=>console.warn('[OneTV]',e.message)));}
       loaders.push(loadPPVTVStreams().catch(e=>console.warn('[PPVTV]',e.message)));
-    Promise.all(loaders).then(()=>{
+      Promise.all(loaders).then(()=>{
       const oneTVTotal=Object.keys(oneTVHomeMap).length;
       const badge=document.getElementById('agg-prog-badge');
-      if(badge)badge.textContent='prog.txt: '+Object.keys(externalStreamsMap).length+' · DDK: '+Object.keys(ddkanquHomeMap).length+(oneTVTotal?' · OneTV: '+oneTVTotal:'')+(Object.keys(ppvTVHomeMap).length?' · PPVTV: '+Object.keys(ppvTVHomeMap).length:'');
+      if(badge)badge.textContent='DDK: '+Object.keys(ddkanquHomeMap).length+(oneTVTotal?' · OneTV: '+oneTVTotal:'')+(Object.keys(ppvTVHomeMap).length?' · PPVTV: '+Object.keys(ppvTVHomeMap).length:'');
       persistLogoCache();
     });
   }
