@@ -823,7 +823,6 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
       </div>
       <div class="settings-grid" style="margin-bottom:12px">
         <div class="form-group"><label>Media Player Base URL</label><input type="text" id="cfg-media-player-base" placeholder="https://sports803.github.io/player/"></div>
-        <div class="form-group"><label>Prog.txt URL (SportsonLine)</label><input type="text" id="cfg-prog-txt-url" placeholder="https://sportsonline.st/prog.txt"></div>
       </div>
       <div class="settings-grid" style="margin-bottom:12px">
         <div class="form-group"><label>Event Firebase Database URL</label><input type="text" id="cfg-firebase-url" placeholder="https://sports-803-1b806-default-rtdb.firebaseio.com"></div>
@@ -982,7 +981,7 @@ let CFG={
   schedTiming:60,schedStatus:'DRAFT',schedInterval:300000,
   schedEnabled:false,schedThumbs:true,logoOverridesRaw:'',
   mediaPlayerBase:'https://sports803.github.io/player/',
-  progTxtUrl:'https://sportsonline.st/prog.txt',
+    // progTxtUrl removed,
   ppvtvMatchesApi:'https://august.ppvtv.icu/api/matches.json',
   firebaseDatabaseUrl:EVENT_FIREBASE_DATABASE_URL,
   firebaseEventsPath:EVENT_FIREBASE_EVENTS_PATH,
@@ -1108,7 +1107,7 @@ function saveCFG(){
   CFG.schedInterval=parseInt(document.getElementById('sched-interval')?.value||300000);
   CFG.schedThumbs=document.getElementById('sched-thumbs')?.checked||false;
   CFG.mediaPlayerBase=v('cfg-media-player-base')||'https://sports803.github.io/player/';
-  CFG.progTxtUrl=v('cfg-prog-txt-url')||'https://sportsonline.st/prog.txt';
+  // CFG.progTxtUrl removed
   CFG.ppvtvMatchesApi=v('cfg-ppvtv-api')||'https://august.ppvtv.icu/api/matches.json';
   CFG.firebaseDatabaseUrl=v('cfg-firebase-url')||EVENT_FIREBASE_DATABASE_URL;
   CFG.firebaseEventsPath=v('cfg-firebase-events-path')||EVENT_FIREBASE_EVENTS_PATH;
@@ -1137,7 +1136,7 @@ function applyConfigToUI(){
   if(document.getElementById('sched-enabled'))document.getElementById('sched-enabled').checked=CFG.schedEnabled||false;
   document.getElementById('st-leagues').textContent=CFG.activeLeagues.length;
   set('cfg-media-player-base',CFG.mediaPlayerBase||'https://sports803.github.io/player/');
-  set('cfg-prog-txt-url',CFG.progTxtUrl||'https://sportsonline.st/prog.txt');
+  // set('cfg-prog-txt-url', ...) removed
   set('cfg-ppvtv-api',CFG.ppvtvMatchesApi||'https://august.ppvtv.icu/api/matches.json');
   set('cfg-firebase-url',CFG.firebaseDatabaseUrl||EVENT_FIREBASE_DATABASE_URL);
   set('cfg-firebase-events-path',CFG.firebaseEventsPath||EVENT_FIREBASE_EVENTS_PATH);
@@ -2200,12 +2199,12 @@ async function loadExternalStreams(){
 function parseDDKMappings(raw){const out={};(raw||'').split('\n').forEach(line=>{const eq=line.indexOf('=');if(eq<0)return;const lhs=line.substring(0,eq).trim();const rhs=line.substring(eq+1).trim();if(!lhs||!rhs)return;const sep=lhs.match(/ (vs\.?|x|–|-) /i);let key;if(sep){const idx=lhs.toLowerCase().indexOf(sep[0].toLowerCase());const a=lhs.substring(0,idx).trim(),b=lhs.substring(idx+sep[0].length).trim();key=pairKey(a,b);}else key=lhs.toLowerCase().trim();out[key]=rhs;});return out;}
 function ddkUrl(idOrUrl){if(!idOrUrl)return null;if(idOrUrl.startsWith('http'))return idOrUrl;return'https://www.ddkqax.com/zhibo/'+idOrUrl+'.html';}
 async function scrapeDDKanqu(home,away){
-  const q=encodeURIComponent(home+' '+away);const searchUrl='https://www.ddkqax.com/search?keyword='+q;const proxies=['https://corsproxy.io/?'+encodeURIComponent(searchUrl),'https://api.allorigins.win/raw?url='+encodeURIComponent(searchUrl)];
-  for(const proxy of proxies){try{const res=await fetch(proxy,{signal:AbortSignal.timeout(8000)});if(!res.ok)continue;const html=await res.text();const m=html.match(/href=["']?(\/zhibo\/(\d+)\.html)["']?/);if(m){const fullUrl='https://www.ddkqax.com'+m[1];return fullUrl;}}catch(e){console.warn('[DDK]',e.message);}}
+  const q=encodeURIComponent(home+' '+away);const searchUrl='https://didiaokanqiu.net/search?keyword='+q;const proxies=['https://corsproxy.io/?'+encodeURIComponent(searchUrl),'https://api.allorigins.win/raw?url='+encodeURIComponent(searchUrl)];
+  for(const proxy of proxies){try{const res=await fetch(proxy,{signal:AbortSignal.timeout(8000)});if(!res.ok)continue;const html=await res.text();const m=html.match(/href=["']?(\/zhibo\/(\d+)\.html)["']?/);if(m){const fullUrl='https://didiaokanqiu.net'+m[1];return fullUrl;}}catch(e){console.warn('[DDK]',e.message);}}
   return null;
 }
 async function loadDDKanquHome(){
-  const url='https://www.ddkqax.com/';const proxies=['https://corsproxy.io/?'+encodeURIComponent(url),'https://api.allorigins.win/raw?url='+encodeURIComponent(url)];
+  const url='https://didiaokanqiu.net/';const proxies=['https://corsproxy.io/?'+encodeURIComponent(url),'https://api.allorigins.win/raw?url='+encodeURIComponent(url)];
   for(const proxy of proxies){try{const res=await fetch(proxy,{signal:AbortSignal.timeout(12000)});if(!res.ok)continue;const html=await res.text();ddkanquHomeMap=parseDDKanquHome(html);const count=Object.keys(ddkanquHomeMap).length;console.log('[DDKanqu] Homepage parsed: '+count+' match(es)');return count;}catch(e){console.warn('[DDKanqu] Home fetch via',proxy,'→',e.message);}}
   return 0;
 }
@@ -2215,7 +2214,7 @@ function parseDDKanquHome(html){
     const zhiBoPath=m[1];const inner=m[2];
     const homeM=inner.match(/class="left-team">([^<]+)<\/span>/);const awayM=inner.match(/class="right-team">([^<]+)<\/span>/);if(!homeM||!awayM)continue;
     const zhHome=homeM[1].trim();const zhAway=awayM[1].trim();
-    const zhibo='https://www.ddkqax.com'+zhiBoPath;const enHome=zhToEn(zhHome);const enAway=zhToEn(zhAway);const key=pairKey(enHome,enAway);
+    const zhibo='https://didiaokanqiu.net'+zhiBoPath;const enHome=zhToEn(zhHome);const enAway=zhToEn(zhAway);const key=pairKey(enHome,enAway);
     if(!map[key])map[key]={zhibo,hls:null,zhHome,zhAway,enHome,enAway};
   }
   return map;
@@ -2302,7 +2301,7 @@ async function refreshAllStreams(){
   if(!CFG.autoFetchStreams&&CFG.enableOneTV===false&&CFG.enablePPVTV===false){toast('Enable at least one stream scraper in Settings first','w');return;}
   updateAggStatus('<span class="spinner"></span> Loading…','i');
   const loaders=[];
-  if(CFG.autoFetchStreams){loaders.push(loadExternalStreams(),loadDDKanquHome());}
+    if(CFG.autoFetchStreams){loaders.push(loadDDKanquHome());}
   if(CFG.enableOneTV)loaders.push(loadOneTVStreams());
   if(CFG.enablePPVTV!==false)loaders.push(loadPPVTVStreams());
   await Promise.all(loaders);
@@ -2783,7 +2782,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(CFG.autoFetchStreams||CFG.enableOneTV||CFG.enablePPVTV){
     ddkanquMappings=parseDDKMappings(CFG.ddkanquMappingsRaw);
     const loaders=[];
-    if(CFG.autoFetchStreams){loaders.push(loadExternalStreams().catch(e=>console.warn('[Streams]',e.message)));loaders.push(loadDDKanquHome().catch(e=>console.warn('[DDKanqu]',e.message)));}
+    if(CFG.autoFetchStreams){loaders.push(loadDDKanquHome().catch(e=>console.warn('[DDKanqu]',e.message)));}
       if(CFG.enableOneTV){loaders.push(loadOneTVStreams().catch(e=>console.warn('[OneTV]',e.message)));}
       loaders.push(loadPPVTVStreams().catch(e=>console.warn('[PPVTV]',e.message)));
     Promise.all(loaders).then(()=>{
