@@ -2362,18 +2362,18 @@ async function searchOneBallHighlights(ev){
   
   const url = 'https://oneball.live/replay/';
   const proxies = [
-    u => 'https://r.jina.ai/' + u,
-    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
-    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-    u => 'https://proxy.cors.sh/' + u
+    { name: 'jina', url: u => 'https://r.jina.ai/' + u },
+    { name: 'codetabs', url: u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u) },
+    { name: 'allorigins', url: u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u) },
+    { name: 'corsproxy', url: u => 'https://corsproxy.io/?url=' + encodeURIComponent(u) }
   ];
 
   let html = '';
-  for(const proxyFn of proxies){
+  for(const p of proxies){
     try {
-      console.log('[OneBallSearch] Trying proxy:', proxyFn(url));
-      const headers = proxyFn.name === 'jina' ? { 'X-Return-Format': 'html' } : {};
-      const res = await fetch(proxyFn(url), { 
+      console.log('[OneBallSearch] Trying proxy:', p.name);
+      const headers = p.name === 'jina' ? { 'X-Return-Format': 'html' } : {};
+      const res = await fetch(p.url(url), { 
         headers,
         signal: AbortSignal.timeout(15000) 
       });
@@ -2509,15 +2509,16 @@ async function fetchAllOneBallHighlights(){
   // Cache the replay list first to avoid repeated list fetches
   const listUrl = 'https://oneball.live/replay/';
   const proxies = [
-    u => 'https://r.jina.ai/' + u,
-    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
-    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)
+    { name: 'jina', url: u => 'https://r.jina.ai/' + u },
+    { name: 'codetabs', url: u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u) },
+    { name: 'allorigins', url: u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u) }
   ];
   
   let listHtml = '';
-  for(const proxyFn of proxies){
+  for(const p of proxies){
     try {
-      const res = await fetch(proxyFn(listUrl), { signal: AbortSignal.timeout(15000) });
+      const headers = p.name === 'jina' ? { 'X-Return-Format': 'html' } : {};
+      const res = await fetch(p.url(listUrl), { headers, signal: AbortSignal.timeout(15000) });
       if(res.ok) { listHtml = await res.text(); if(listHtml.length > 500) break; }
     } catch(e) {}
   }
@@ -2567,9 +2568,10 @@ async function fetchAllOneBallHighlights(){
     if(matchUrl) {
       // Now fetch specific page to get data-url
       let pageHtml = '';
-      for(const proxyFn of proxies){
+      for(const p of proxies){
         try {
-          const res = await fetch(proxyFn(matchUrl), { signal: AbortSignal.timeout(10000) });
+          const headers = p.name === 'jina' ? { 'X-Return-Format': 'html' } : {};
+          const res = await fetch(p.url(matchUrl), { headers, signal: AbortSignal.timeout(10000) });
           if(res.ok) { pageHtml = await res.text(); if(pageHtml.length > 500) break; }
         } catch(e) {}
       }
