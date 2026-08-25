@@ -2352,34 +2352,66 @@ async function searchOneBallHighlights(ev){
   
   const url = 'https://oneball.live/replay/';
   const proxies = [
+    u => 'https://r.jina.ai/' + u,
     u => 'https://corsproxy.io/?' + encodeURIComponent(u),
-    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://proxy.cors.sh/' + u
   ];
 
   let html = '';
   for(const proxyFn of proxies){
     try {
-      const res = await fetch(proxyFn(url), { signal: AbortSignal.timeout(12000) });
-      if(res.ok) { html = await res.text(); if(html.length > 500) break; }
-    } catch(e) {}
+      console.log('[OneBallSearch] Trying proxy:', proxyFn(url));
+      const headers = proxyFn.name === 'jina' ? { 'X-Return-Format': 'html' } : {};
+      const res = await fetch(proxyFn(url), { 
+        headers,
+        signal: AbortSignal.timeout(15000) 
+      });
+      if(res.ok) { 
+        html = await res.text(); 
+        if(html.length > 500) {
+          console.log('[OneBallSearch] Success with proxy');
+          break; 
+        } 
+      }
+    } catch(e) {
+      console.warn('[OneBallSearch] Proxy failed:', e.message);
+    }
   }
 
   if(!html) { toast('Could not fetch OneBall Replay list', 'e'); return null; }
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-  const cards = Array.from(doc.querySelectorAll('.recording-content, .match-card, a[href*="/replay/"]'));
-  
+  // If Jina is used, it might return Markdown. Check for links in markdown first.
   let matchUrl = '';
   const nHome = normTeam(home), nAway = normTeam(away);
-  for(const card of cards) {
-    const cardText = normTeam(card.textContent);
-    if(cardText.includes(nHome) && cardText.includes(nAway)) {
-      const link = card.tagName === 'A' ? card : card.querySelector('a');
-      if(link) {
-        const href = link.getAttribute('href');
-        matchUrl = href.startsWith('http') ? href : new URL(href, 'https://oneball.live').href;
-        break;
+  
+  if(html.includes('](')) {
+    // Basic Markdown link extraction: [Title](URL)
+    const mdLinks = html.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+\/replay\/[^\)]+)\)/gi);
+    if(mdLinks) {
+      for(const md of mdLinks) {
+        const m = md.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/i);
+        if(m && normTeam(m[1]).includes(nHome) && normTeam(m[1]).includes(nAway)) {
+          matchUrl = m[2];
+          break;
+        }
+      }
+    }
+  }
+
+  if(!matchUrl) {
+    const cards = Array.from(doc.querySelectorAll('.recording-content, .match-card, a[href*="/replay/"]'));
+    for(const card of cards) {
+      const cardText = normTeam(card.textContent);
+      if(cardText.includes(nHome) && cardText.includes(nAway)) {
+        const link = card.tagName === 'A' ? card : card.querySelector('a');
+        if(link) {
+          const href = link.getAttribute('href');
+          matchUrl = href.startsWith('http') ? href : new URL(href, 'https://oneball.live').href;
+          break;
+        }
       }
     }
   }
