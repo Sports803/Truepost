@@ -2179,7 +2179,16 @@ document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click
 function toast(msg,type='i'){const t=document.createElement('div');t.className='toast '+type;const icons={s:'✓ ',e:'✕ ',i:'ℹ ',w:'⚠ '};t.textContent=(icons[type]||'')+msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),320);},3000);}
 
 // ═══ STREAM AGGREGATOR ═══
-function normTeam(name){return(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(fc|afc|rfc|sc|cf|ac|as|bsc|rcd|rgb|vfb|vfl|1\.fc)\b/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();}
+function normTeam(name){
+  if(!name) return '';
+  return name.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase()
+    .replace(/\b(fc|afc|rfc|sc|cf|ac|as|bsc|rcd|rc|vfb|vfl|1\.fc|real|deportivo|ca|cf|athletic|clube|club|c\.f\.|f\.c\.|c\.a\.)\b/g,'')
+    .replace(/[^a-z0-9\s]/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
 function pairKey(a,b){return[normTeam(a),normTeam(b)].sort().join('|');}
 // Prog.txt removed
 function parseDDKMappings(raw){const out={};(raw||'').split('\n').forEach(line=>{const eq=line.indexOf('=');if(eq<0)return;const lhs=line.substring(0,eq).trim();const rhs=line.substring(eq+1).trim();if(!lhs||!rhs)return;const sep=lhs.match(/ (vs\.?|x|–|-) /i);let key;if(sep){const idx=lhs.toLowerCase().indexOf(sep[0].toLowerCase());const a=lhs.substring(0,idx).trim(),b=lhs.substring(idx+sep[0].length).trim();key=pairKey(a,b);}else key=lhs.toLowerCase().trim();out[key]=rhs;});return out;}
@@ -2388,13 +2397,25 @@ async function searchOneBallHighlights(ev){
   let matchUrl = '';
   const nHome = normTeam(home), nAway = normTeam(away);
   
+  // Enhanced matching logic
+  const matchFound = (text) => {
+    const nText = normTeam(text);
+    // Try both teams present
+    if(nText.includes(nHome) && nText.includes(nAway)) return true;
+    // Try split words for partial matches (e.g., "Malaga" in "Malaga C.F.")
+    const homeWords = nHome.split(' ').filter(w => w.length > 2);
+    const awayWords = nAway.split(' ').filter(w => w.length > 2);
+    const hasHome = homeWords.some(w => nText.includes(w));
+    const hasAway = awayWords.some(w => nText.includes(w));
+    return hasHome && hasAway;
+  };
+
   if(html.includes('](')) {
-    // Basic Markdown link extraction: [Title](URL)
     const mdLinks = html.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+\/replay\/[^\)]+)\)/gi);
     if(mdLinks) {
       for(const md of mdLinks) {
         const m = md.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/i);
-        if(m && normTeam(m[1]).includes(nHome) && normTeam(m[1]).includes(nAway)) {
+        if(m && matchFound(m[1])) {
           matchUrl = m[2];
           break;
         }
@@ -2405,8 +2426,7 @@ async function searchOneBallHighlights(ev){
   if(!matchUrl) {
     const cards = Array.from(doc.querySelectorAll('.recording-content, .match-card, a[href*="/replay/"]'));
     for(const card of cards) {
-      const cardText = normTeam(card.textContent);
-      if(cardText.includes(nHome) && cardText.includes(nAway)) {
+      if(matchFound(card.textContent)) {
         const link = card.tagName === 'A' ? card : card.querySelector('a');
         if(link) {
           const href = link.getAttribute('href');
@@ -2516,24 +2536,30 @@ async function fetchAllOneBallHighlights(){
     const nHome = normTeam(home), nAway = normTeam(away);
     
     let matchUrl = '';
-    // Check markdown links first
+    const matchFound = (text) => {
+      const nText = normTeam(text);
+      if(nText.includes(nHome) && nText.includes(nAway)) return true;
+      const homeWords = nHome.split(' ').filter(w => w.length > 2);
+      const awayWords = nAway.split(' ').filter(w => w.length > 2);
+      return homeWords.some(w => nText.includes(w)) && awayWords.some(w => nText.includes(w));
+    };
+
     if(listHtml.includes('](')) {
       const mdLinks = listHtml.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+\/replay\/[^\)]+)\)/gi);
       if(mdLinks) {
         for(const md of mdLinks) {
           const m = md.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/i);
-          if(m && normTeam(m[1]).includes(nHome) && normTeam(m[1]).includes(nAway)) { matchUrl = m[2]; break; }
+          if(m && matchFound(m[1])) { matchUrl = m[2]; break; }
         }
       }
     }
     
-    // Check DOM if markdown failed
     if(!matchUrl) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(listHtml, 'text/html');
       const cards = Array.from(doc.querySelectorAll('.recording-content, .match-card, a[href*="/replay/"]'));
       for(const card of cards) {
-        if(normTeam(card.textContent).includes(nHome) && normTeam(card.textContent).includes(nAway)) {
+        if(matchFound(card.textContent)) {
           const link = card.tagName === 'A' ? card : card.querySelector('a');
           if(link) {
             const href = link.getAttribute('href');
