@@ -2315,10 +2315,12 @@ async function testDDKanquLookup(){
 // ═══ HIGHLIGHTS PLAYER ═══
 function buildHighlightsPlayerIframe(url){
   if(!url)return'';
-  // Use the same player base as your streams (from Settings)
   const playerBase = CFG.playerBase || 'https://sports803.github.io/player/';
-  // The embed parameter should get the raw embed URL (not double-encoded)
-  const src = playerBase + '?embed=' + encodeURIComponent(url);
+  // If URL already has mora=, use it directly, else add it
+  let src = url;
+  if(!url.includes('?mora=') && !url.includes('&mora=')) {
+    src = playerBase + (playerBase.includes('?') ? '&' : '?') + 'mora=' + encodeURIComponent(url);
+  }
   return '<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px"><iframe loading="lazy" src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:10px" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>';
 }
 function updateHighlightsPlayer(){
@@ -2339,95 +2341,114 @@ function copyHighlightsPlayerCode(){
 }
 
 
-// ═══ YOUTUBE HIGHLIGHTS SEARCH ═══
-const YT_PRIORITY_CHANNELS={
-  nfl:['UCB2G9aBKHxfFqGpgMt1WKSA'],
-  f1:['UCB_qr75-ydFVKSF9Dmo6izg'],
-  motogp:['UCmkNMbsKc_Q3UaXTG4UlbbQ'],
-  nba:['UCzL7I9P4xqBT7wDdGdAjOCw'],
-  nhl:['UCqFMzb-4AUf6WAIbl132QKA'],
-  epl:['UCqZQlzSHbVJrwrn5XvzrzcA'],
-  laliga:['UCpcTrCXblq78GZrTUTLWeBw'],
-  seriea:['UCNAf1k0yIjyGu3k9BwAg3lg'],
-  ucl:['UCpcTrCXblq78GZrTUTLWeBw'],
-  bundesliga:['UC_xU5tpJ_DUfKFI2qoNQMqw'],
-  bein:['UCY52HZwKL8IAfFxFn7BPQfA'],
-};
-const YT_QUERY_TEMPLATES={
-  nfl:'{home} vs {away} NFL highlights official',
-  f1:'{name} F1 highlights official Formula 1',
-  motogp:'{name} MotoGP highlights official',
-  nba:'{home} vs {away} NBA highlights official',
-  nhl:'{home} vs {away} NHL highlights official',
-  epl:'{home} vs {away} Premier League highlights official',
-  laliga:'{home} vs {away} LaLiga highlights official',
-  seriea:'{home} vs {away} Serie A highlights official',
-  ucl:'{home} vs {away} Champions League highlights official',
-  bundesliga:'{home} vs {away} Bundesliga highlights official',
-  ligue1:'{home} vs {away} Ligue 1 highlights official',
-  mls:'{home} vs {away} MLS highlights official',
-  ufc:'{name} UFC highlights official',
-  atp:'{home} vs {away} ATP tennis highlights',
-  wta:'{home} vs {away} WTA tennis highlights',
-  pga:'{name} PGA Tour highlights official',
-  nascar:'{name} NASCAR highlights official',
-  _default:'{home} vs {away} {league} highlights official',
-};
+// ═══ ONEBALL REPLAY HIGHLIGHTS SEARCH ═══
+async function searchOneBallHighlights(ev){
+  if(!ev) return null;
+  const home = ev.home?.name || '';
+  const away = ev.away?.name || '';
+  
+  console.log('[OneBallSearch] Starting for:', home, 'vs', away);
+  toast('Searching OneBall Replay: ' + home + ' vs ' + away + '…', 'i');
+  
+  const url = 'https://oneball.live/replay/';
+  const proxies = [
+    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)
+  ];
 
-function buildYTQuery(ev){
-  const lid=ev.league?.id||'';const tmpl=YT_QUERY_TEMPLATES[lid]||YT_QUERY_TEMPLATES._default;
-  return tmpl
-    .replace('{home}',ev.home?.name||ev.name||'')
-    .replace('{away}',ev.away?.name||'')
-    .replace('{name}',ev.name||((ev.home?.name||'')+' vs '+(ev.away?.name||'')))
-    .replace('{league}',ev.league?.name||'')
-    .replace(/\s+/g,' ').trim();
+  let html = '';
+  for(const proxyFn of proxies){
+    try {
+      const res = await fetch(proxyFn(url), { signal: AbortSignal.timeout(12000) });
+      if(res.ok) { html = await res.text(); if(html.length > 500) break; }
+    } catch(e) {}
+  }
+
+  if(!html) { toast('Could not fetch OneBall Replay list', 'e'); return null; }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const cards = Array.from(doc.querySelectorAll('.recording-content, .match-card, a[href*="/replay/"]'));
+  
+  let matchUrl = '';
+  const nHome = normTeam(home), nAway = normTeam(away);
+  for(const card of cards) {
+    const cardText = normTeam(card.textContent);
+    if(cardText.includes(nHome) && cardText.includes(nAway)) {
+      const link = card.tagName === 'A' ? card : card.querySelector('a');
+      if(link) {
+        const href = link.getAttribute('href');
+        matchUrl = href.startsWith('http') ? href : new URL(href, 'https://oneball.live').href;
+        break;
+      }
+    }
+  }
+
+  if(!matchUrl) { toast('No matching replay found on OneBall', 'w'); return null; }
+
+  // Now fetch the specific replay page to get data-url
+  let pageHtml = '';
+  for(const proxyFn of proxies){
+    try {
+      const res = await fetch(proxyFn(matchUrl), { signal: AbortSignal.timeout(10000) });
+      if(res.ok) { pageHtml = await res.text(); if(pageHtml.length > 500) break; }
+    } catch(e) {}
+  }
+
+  if(!pageHtml) { toast('Could not fetch replay page details', 'e'); return null; }
+
+  const m = pageHtml.match(/data-url=["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i);
+  if(m) {
+    const rawM3u8 = m[1].replace(/&amp;/g, '&');
+    return {
+      url: rawM3u8,
+      playerUrl: (CFG.playerBase || 'https://sports803.github.io/player/') + '?mora=' + encodeURIComponent(rawM3u8),
+      title: home + ' vs ' + away + ' Highlights'
+    };
+  }
+
+  toast('No m3u8 stream found on replay page', 'w');
+  return null;
 }
 
-async function searchYTHighlights(ev){
-  const key=CFG.ytApiKey;if(!key){toast('Add YouTube Data API key in Settings → APIs & Upload','w');return null;}
-  const query=buildYTQuery(ev);toast('Searching YouTube: '+query.substring(0,50)+'…','i');
-  const lid=ev.league?.id||'';const priorityCh=YT_PRIORITY_CHANNELS[lid]||[];
-  const preferSources=['NFL','Formula 1','MotoGP','beIN SPORTS','Serie A','LaLiga','NHL'];
-  const params=new URLSearchParams({part:'snippet',type:'video',videoDefinition:'high',order:'date',maxResults:'10',q:query,key});
-  try{
-    const res=await fetch('https://www.googleapis.com/youtube/v3/search?'+params);
-    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'HTTP '+res.status);}
-    const data=await res.json();const items=data.items||[];
-    if(!items.length){toast('No YouTube results found','w');return null;}
-    let best=null;
-    for(const item of items){const ch=item.snippet?.channelId,cn=item.snippet?.channelTitle||'';if(priorityCh.includes(ch)){best=item;break;}if(!best&&preferSources.some(s=>cn.toLowerCase().includes(s.toLowerCase())))best=item;}
-    if(!best)best=items[0];
-    const videoId=best.id?.videoId;if(!videoId){toast('No video ID found','w');return null;}
-    return{url:'https://www.youtube.com/embed/'+videoId,embed:'https://www.youtube.com/embed/'+videoId,title:best.snippet?.title||'',channel:best.snippet?.channelTitle||'',thumb:best.snippet?.thumbnails?.high?.url||''};
-  }catch(e){toast('YouTube search failed: '+e.message,'e');return null;}
+async function oneBallSearchAndFill(sid){
+  const ev = sid ? findEv(sid) : currentComposeEv;
+  if(!ev) { toast('No event selected', 'w'); return; }
+  
+  const result = await searchOneBallHighlights(ev);
+  if(!result) return;
+
+  set('highlights-video-url', result.playerUrl);
+  updateHighlightsPlayer();
+  
+  const parsed = parseTitle(v('post-title'));
+  if(parsed) {
+    setTimeout(() => triggerComposeThumb(parsed, v('post-title')), 300);
+  }
+
+  const body = document.getElementById('post-body');
+  if(body.value && !body.value.includes(result.playerUrl)){
+    const block = '\n\n' + buildHighlightsPlayerIframe(result.playerUrl);
+    body.value += block;
+    updateSEO();
+    toast('✓ OneBall Replay found!', 's');
+  } else {
+    toast('✓ OneBall Replay URL set', 's');
+  }
+  set('hl-video', result.playerUrl);
 }
 
-async function ytSearchAndFill(sid){
-  const ev=sid?findEv(sid):currentComposeEv;if(!ev){toast('No event selected','w');return;}
-  const result=await searchYTHighlights(ev);if(!result)return;
-  set('highlights-video-url',result.url);updateHighlightsPlayer();
-  // Also refresh thumbnail to ensure score/highlights mode is visible
-const parsed = parseTitle(v('post-title'));
-if(parsed) {
-  setTimeout(() => triggerComposeThumb(parsed, v('post-title')), 300);
-}
-  const body=document.getElementById('post-body');
-  if(body.value&&!body.value.includes(result.url)){
-    const block='\n\n'+buildHighlightsPlayerIframe(result.url);
-    body.value+=block;updateSEO();
-    toast('✓ Highlights found: '+result.title.substring(0,50),'s');
-  }else{toast('✓ Highlights URL set: '+result.title.substring(0,50),'s');}
-  set('hl-video',result.url);
-}
-
-async function ytSearchForModal(){
-  const idx=parseInt(document.getElementById('hl-select').value);
-  if(isNaN(idx)||idx<0){toast('Select an event first','w');return;}
-  const ev=allEvents[idx];if(!ev)return;
-  const result=await searchYTHighlights(ev);if(!result)return;
-  set('hl-video',result.url);
-  toast('✓ Found on '+result.channel+': '+result.title.substring(0,40),'s');
+async function oneBallSearchForModal(){
+  const idx = parseInt(document.getElementById('hl-select').value);
+  if(isNaN(idx) || idx < 0) { toast('Select an event first', 'w'); return; }
+  const ev = allEvents[idx];
+  if(!ev) return;
+  
+  const result = await searchOneBallHighlights(ev);
+  if(!result) return;
+  
+  set('hl-video', result.playerUrl);
+  toast('✓ OneBall Replay found: ' + result.title, 's');
 }
 
 // ═══════════════════════════════════════════════════════
