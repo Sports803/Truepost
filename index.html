@@ -370,6 +370,7 @@ button:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
       <button class="btn-red" onclick="fetchAllEvents()"><span id="fetch-spinner" style="display:none" class="spinner"></span>🔄 Fetch All</button>
       <button class="btn-gold" onclick="bulkGenThumbs()">🖼️ Bulk Gen Thumbs</button>
       <button class="btn-green" onclick="bulkPostAll()">📤 Bulk Post</button>
+      <button class="btn-orange" onclick="fetchAllOneBallHighlights()">🎬 Fetch All HL</button>
     </div>
   </div>
   <div class="league-pills" id="league-filter-pills"></div>
@@ -2481,6 +2482,97 @@ async function oneBallSearchForModal(){
   
   set('hl-video', result.playerUrl);
   toast('✓ OneBall Replay found: ' + result.title, 's');
+}
+
+async function fetchAllOneBallHighlights(){
+  const fin = allEvents.filter(ev => ['Final','FT','Completed','Full Time','AET','Penalties','Post','Ended','Finished'].includes(ev.status));
+  if(!fin.length){ toast('No finished events found to fetch highlights for.','w'); return; }
+  
+  toast('Starting batch OneBall search for ' + fin.length + ' events...', 'i');
+  let foundCount = 0;
+  
+  // Cache the replay list first to avoid repeated list fetches
+  const listUrl = 'https://oneball.live/replay/';
+  const proxies = [
+    u => 'https://r.jina.ai/' + u,
+    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)
+  ];
+  
+  let listHtml = '';
+  for(const proxyFn of proxies){
+    try {
+      const res = await fetch(proxyFn(listUrl), { signal: AbortSignal.timeout(15000) });
+      if(res.ok) { listHtml = await res.text(); if(listHtml.length > 500) break; }
+    } catch(e) {}
+  }
+  
+  if(!listHtml) { toast('Could not fetch OneBall Replay list for batch search', 'e'); return; }
+  
+  // Process each finished event
+  for(const ev of fin){
+    const home = ev.home?.name || '';
+    const away = ev.away?.name || '';
+    const nHome = normTeam(home), nAway = normTeam(away);
+    
+    let matchUrl = '';
+    // Check markdown links first
+    if(listHtml.includes('](')) {
+      const mdLinks = listHtml.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+\/replay\/[^\)]+)\)/gi);
+      if(mdLinks) {
+        for(const md of mdLinks) {
+          const m = md.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/i);
+          if(m && normTeam(m[1]).includes(nHome) && normTeam(m[1]).includes(nAway)) { matchUrl = m[2]; break; }
+        }
+      }
+    }
+    
+    // Check DOM if markdown failed
+    if(!matchUrl) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(listHtml, 'text/html');
+      const cards = Array.from(doc.querySelectorAll('.recording-content, .match-card, a[href*="/replay/"]'));
+      for(const card of cards) {
+        if(normTeam(card.textContent).includes(nHome) && normTeam(card.textContent).includes(nAway)) {
+          const link = card.tagName === 'A' ? card : card.querySelector('a');
+          if(link) {
+            const href = link.getAttribute('href');
+            matchUrl = href.startsWith('http') ? href : new URL(href, 'https://oneball.live').href;
+            break;
+          }
+        }
+      }
+    }
+    
+    if(matchUrl) {
+      // Now fetch specific page to get data-url
+      let pageHtml = '';
+      for(const proxyFn of proxies){
+        try {
+          const res = await fetch(proxyFn(matchUrl), { signal: AbortSignal.timeout(10000) });
+          if(res.ok) { pageHtml = await res.text(); if(pageHtml.length > 500) break; }
+        } catch(e) {}
+      }
+      
+      if(pageHtml) {
+        const m = pageHtml.match(/data-url=["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i);
+        if(m) {
+          const rawM3u8 = m[1].replace(/&amp;/g, '&');
+          const playerUrl = (CFG.playerBase || 'https://sports803.github.io/player/') + '?mora=' + encodeURIComponent(rawM3u8);
+          
+          // Save to postLog
+          setLog(ev, { hasHL: true, hlUrl: playerUrl });
+          foundCount++;
+          console.log('[BatchHL] Found for:', home, 'vs', away);
+        }
+      }
+    }
+    // Small delay between page fetches to avoid rate limits
+    await new Promise(r => setTimeout(r, 500));
+  }
+  
+  renderEventCards(allEvents);
+  toast('Batch search complete! Found ' + foundCount + ' highlights.', 's');
 }
 
 // ═══════════════════════════════════════════════════════
