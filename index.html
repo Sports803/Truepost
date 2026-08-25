@@ -2184,7 +2184,7 @@ function normTeam(name){
   return name.normalize('NFD')
     .replace(/[\u0300-\u036f]/g,'')
     .toLowerCase()
-    .replace(/\b(fc|afc|rfc|sc|cf|ac|as|bsc|rcd|rc|vfb|vfl|1\.fc|real|deportivo|ca|cf|athletic|clube|club|c\.f\.|f\.c\.|c\.a\.)\b/g,'')
+    .replace(/\b(fc|afc|rfc|sc|cf|ac|as|bsc|rcd|rc|vfb|vfl|1\.fc|real|deportivo|ca|cf|athletic|clube|club|c\.f\.|f\.c\.|c\.a\.|st|st\.)\b/g,'')
     .replace(/[^a-z0-9\s]/g,'')
     .replace(/\s+/g,' ')
     .trim();
@@ -2400,14 +2400,11 @@ async function searchOneBallHighlights(ev){
   // Enhanced matching logic
   const matchFound = (text) => {
     const nText = normTeam(text);
-    // Try both teams present
     if(nText.includes(nHome) && nText.includes(nAway)) return true;
-    // Try split words for partial matches (e.g., "Malaga" in "Malaga C.F.")
     const homeWords = nHome.split(' ').filter(w => w.length > 2);
     const awayWords = nAway.split(' ').filter(w => w.length > 2);
-    const hasHome = homeWords.some(w => nText.includes(w));
-    const hasAway = awayWords.some(w => nText.includes(w));
-    return hasHome && hasAway;
+    if(!homeWords.length || !awayWords.length) return false;
+    return homeWords.some(w => nText.includes(w)) && awayWords.some(w => nText.includes(w));
   };
 
   if(html.includes('](')) {
@@ -2541,6 +2538,7 @@ async function fetchAllOneBallHighlights(){
       if(nText.includes(nHome) && nText.includes(nAway)) return true;
       const homeWords = nHome.split(' ').filter(w => w.length > 2);
       const awayWords = nAway.split(' ').filter(w => w.length > 2);
+      if(!homeWords.length || !awayWords.length) return false;
       return homeWords.some(w => nText.includes(w)) && awayWords.some(w => nText.includes(w));
     };
 
