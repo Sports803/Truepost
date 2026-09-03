@@ -1886,9 +1886,10 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
   <div class="settings-grid">
     <div class="card">
       <div class="card-title">Blogger / Google OAuth</div>
-      <div class="form-group"><label>Blog ID</label><input type="text" id="cfg-blogid" placeholder="123456789"></div>
+      <div class="form-group"><label>Active Blogger Blog</label><select id="cfg-blog-select" onchange="selectBloggerBlog(this.value)"><option value="">Sign in to load your blogs</option></select><div id="blogger-status" style="font-size:.68rem;color:var(--muted2);margin-top:6px">Sign in with Google to load all blogs you can manage.</div></div>
+      <div class="form-group"><label>Selected Blog ID</label><input type="text" id="cfg-blogid" placeholder="Loaded automatically after sign-in" readonly></div>
       <div class="form-group"><label>Google OAuth Client ID</label><input type="text" id="cfg-clientid" placeholder="xxx.apps.googleusercontent.com"></div>
-      <button class="btn-red btn-sm" onclick="saveCFG()">💾 Save</button>
+      <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn-red btn-sm" onclick="saveCFG()">💾 Save</button><button class="btn-ghost btn-sm" onclick="refreshBloggerBlogs()">🔄 Refresh Blogs</button></div>
     </div>
     <div class="card">
       <div class="form-group"><label>imgbb API Key</label><input type="text" id="cfg-imgbb" placeholder="Get free at api.imgbb.com"></div>
@@ -2122,6 +2123,9 @@ const SK_DDKC = 's803v9_ddkc';
 const SK_FR = 's803v9_fr';
 const SK_TEMPLATES = 's803v9_templates';
 const SK_DRAFTS = 's803v9_drafts';
+// Match the movie app’s shared-origin session key; keep the old key for migration.
+const SK_BLOGGER_TOKEN = 'bloggerToken';
+const SK_BLOGGER_TOKEN_LEGACY = 's803v9_blogger_token';
 
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
 const TSDB = 'https://www.thesportsdb.com/api/v1/json/3';
@@ -2152,6 +2156,7 @@ let CFG = {
 let LOGO_OVERRIDES = {}, LOGO_CACHE = {};
 let allEvents = [], channels = [], postLog = {};
 let accessToken = null, editingCH = null;
+let bloggerUser = null, bloggerBlogs = [], bloggerTokenClient = null;
 let editingPostId = null, editingEventKey = null;
 let schedTimer = null, schedNextFire = null;
 let tbDebounce, composDebounce;
@@ -2664,44 +2669,129 @@ function importTemplates() {
 // ============================================================
 //  BLOGGER AUTH
 // ============================================================
+// ----- GOOGLE OAUTH + MULTI-BLOG ACCOUNT -----
+function updateAuthUI(isSignedIn) {
+  const signed = Boolean(isSignedIn && accessToken);
+  const dot = document.getElementById('auth-dot');
+  const label = document.getElementById('auth-label');
+  const button = document.getElementById('auth-btn');
+  if (dot) dot.className = signed ? 'on' : '';
+  if (label) { label.textContent = signed ? (bloggerUser?.name || 'Signed in') : 'Not signed in'; label.style.color = signed ? 'var(--green)' : 'var(--muted)'; }
+  if (button) button.textContent = signed ? 'Sign out' : 'Sign in';
+  syncMobileAuth();
+  renderBloggerBlogs();
+}
+
+function initOAuth() {
+  CFG.clientId = CFG.clientId || EVENT_BUILTIN_CLIENT_ID;
+  if (!window.google?.accounts?.oauth2) return false;
+  try {
+    bloggerTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CFG.clientId,
+      scope: 'https://www.googleapis.com/auth/blogger',
+      callback: response => {
+        if (response.error) { toast('Auth error: ' + response.error, 'e'); return; }
+        accessToken = response.access_token;
+        try { localStorage.setItem(SK_BLOGGER_TOKEN, accessToken); } catch (e) {}
+        updateAuthUI(true);
+        fetchBloggerInfo();
+        toast('Signed in to Blogger ✓', 's');
+      }
+    });
+    return true;
+  } catch (e) {
+    console.warn('[OAuth] Initialization failed:', e.message);
+    bloggerTokenClient = null;
+    return false;
+  }
+}
+
 function handleAuth() {
   if (accessToken) { signOut(); return; }
-  CFG.clientId = CFG.clientId || EVENT_BUILTIN_CLIENT_ID;
-  if (!CFG.clientId) { toast('Enter OAuth Client ID in Settings', 'e'); return; }
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: CFG.clientId,
-    scope: 'https://www.googleapis.com/auth/blogger',
-    callback: r => {
-      if (r.error) { toast('Auth error: ' + r.error, 'e'); return; }
-      accessToken = r.access_token;
-      document.getElementById('auth-dot').className = 'on';
-      document.getElementById('auth-label').textContent = 'Signed in';
-      document.getElementById('auth-label').style.color = 'var(--green)';
-      document.getElementById('auth-btn').textContent = 'Sign out';
-      syncMobileAuth();
-      toast('Signed in ✓', 's');
-    }
-  });
-  client.requestAccessToken();
+  if (!bloggerTokenClient && !initOAuth()) {
+    toast('Google sign-in is still loading. Try again in a moment.', 'w');
+    return;
+  }
+  bloggerTokenClient.requestAccessToken({ prompt: 'consent' });
 }
+
 function signOut() {
-  if (accessToken) try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch (e) {}
+  if (accessToken && window.google?.accounts?.oauth2) {
+    try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch (e) {}
+  }
   accessToken = null;
-  document.getElementById('auth-dot').className = '';
-  document.getElementById('auth-label').textContent = 'Not signed in';
-  document.getElementById('auth-label').style.color = 'var(--muted)';
-  document.getElementById('auth-btn').textContent = 'Sign in';
-  syncMobileAuth();
+  bloggerUser = null;
+  bloggerBlogs = [];
+  try { localStorage.removeItem(SK_BLOGGER_TOKEN); localStorage.removeItem(SK_BLOGGER_TOKEN_LEGACY); } catch (e) {}
+  updateAuthUI(false);
   toast('Signed out', 'i');
 }
+
 function syncMobileAuth() {
   const signed = !!accessToken;
   const dot = document.getElementById('mobile-auth-dot');
   const label = document.getElementById('mobile-auth-label');
   const button = document.getElementById('mobile-auth-btn');
   dot?.classList.toggle('on', signed);
-  if (label) { label.textContent = signed ? 'Signed in' : 'Not signed in'; label.style.color = signed ? 'var(--green)' : 'var(--muted)'; }
+  if (label) { label.textContent = signed ? (bloggerUser?.name || 'Signed in') : 'Not signed in'; label.style.color = signed ? 'var(--green)' : 'var(--muted)'; }
   if (button) button.textContent = signed ? 'Sign out' : 'Sign in';
+}
+
+function renderBloggerBlogs() {
+  const select = document.getElementById('cfg-blog-select');
+  const status = document.getElementById('blogger-status');
+  if (!select) return;
+  const current = String(CFG.blogId || '');
+  if (!accessToken) {
+    select.innerHTML = '<option value="">Sign in to load your blogs</option>';
+    if (status) status.textContent = 'Sign in with Google to load all blogs you can manage.';
+    return;
+  }
+  if (!bloggerBlogs.length) {
+    select.innerHTML = '<option value="">No blogs loaded — click Refresh Blogs</option>';
+    if (status) status.textContent = 'Signed in, but no blog list is loaded yet.';
+    return;
+  }
+  select.innerHTML = '<option value="">— Select blog —</option>' + bloggerBlogs.map(blog => '<option value="' + escLiveTV(blog.id) + '">' + escLiveTV(blog.name || blog.url || blog.id) + '</option>').join('');
+  select.value = current;
+  if (status) status.textContent = bloggerUser?.name ? bloggerUser.name + ' · ' + bloggerBlogs.length + ' blog(s) found' : bloggerBlogs.length + ' blog(s) found';
+}
+
+function selectBloggerBlog(blogId) {
+  CFG.blogId = String(blogId || '');
+  set('cfg-blogid', CFG.blogId);
+  saveAll();
+  if (CFG.blogId) toast('Active Blogger blog selected ✓', 's');
+}
+
+async function fetchBloggerInfo() {
+  if (!accessToken) return;
+  try {
+    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: 'Bearer ' + accessToken } });
+    if (userResponse.status === 401) throw new Error('Session expired');
+    if (!userResponse.ok) throw new Error('User info HTTP ' + userResponse.status);
+    bloggerUser = await userResponse.json();
+    const blogsResponse = await fetch('https://www.googleapis.com/blogger/v3/users/self/blogs', { headers: { Authorization: 'Bearer ' + accessToken } });
+    if (blogsResponse.status === 401) throw new Error('Session expired');
+    if (!blogsResponse.ok) throw new Error('Blogs HTTP ' + blogsResponse.status);
+    const data = await blogsResponse.json();
+    bloggerBlogs = Array.isArray(data.items) ? data.items : [];
+    const hasCurrent = bloggerBlogs.some(blog => String(blog.id) === String(CFG.blogId));
+    if (!hasCurrent && bloggerBlogs.length) CFG.blogId = String(bloggerBlogs[0].id);
+    set('cfg-blogid', CFG.blogId);
+    saveAll();
+    updateAuthUI(true);
+    toast(bloggerBlogs.length + ' Blogger blog(s) loaded ✓', 's');
+  } catch (e) {
+    console.warn('[Blogger auth]', e.message);
+    if (/expired|401/i.test(e.message)) signOut();
+    else toast('Could not load Blogger blogs: ' + e.message, 'e');
+  }
+}
+
+function refreshBloggerBlogs() {
+  if (!accessToken) { toast('Sign in with Google first', 'w'); return; }
+  fetchBloggerInfo();
 }
 
 // ============================================================
@@ -4072,14 +4162,25 @@ async function loadOneTVStreams() {
 
 function parsePPVTVMatches(payload) {
   const map = {};
-  const matches = Array.isArray(payload?.matches) ? payload.matches : [];
+  const matches = Array.isArray(payload) ? payload : Array.isArray(payload?.matches) ? payload.matches : Array.isArray(payload?.data?.matches) ? payload.data.matches : [];
+  const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
+  const readTeam = (match, side) => clean(match?.teams?.[side]?.name || match?.[side + '_team']?.name || match?.[side + '_team'] || match?.[side]?.name || match?.[side] || '');
+  const readTitleTeams = match => {
+    const title = clean(match?.title);
+    const parts = title.split(/\s+(?:vs?\.?|v|x|versus)\s+/i);
+    return parts.length >= 2 ? [clean(parts[0]), clean(parts.slice(1).join(' vs '))] : ['', ''];
+  };
   matches.forEach(match => {
-    const home = match?.teams?.home?.name || '', away = match?.teams?.away?.name || '';
+    let home = readTeam(match, 'home'), away = readTeam(match, 'away');
+    if (!home || !away) [home, away] = readTitleTeams(match);
     if (!home || !away) return;
     const embeds = [];
-    if (match.embed_url) embeds.push(match.embed_url);
-    (Array.isArray(match.servers) ? match.servers : []).forEach(server => { if (server?.embed_url) embeds.push(server.embed_url); });
-    const unique = [...new Set(embeds.filter(u => /^https?:\/\//i.test(u)))];
+    [match.embed_url, match.embedUrl, match.page_url, match.url, match.stream_url].forEach(url => { if (url) embeds.push(String(url)); });
+    const servers = Array.isArray(match.servers) ? match.servers : Array.isArray(match.sources) ? match.sources : [];
+    servers.forEach(server => {
+      [server?.embed_url, server?.embedUrl, server?.url, server?.src].forEach(url => { if (url) embeds.push(String(url)); });
+    });
+    const unique = [...new Set(embeds.map(url => url.trim()).filter(url => /^https:\/\//i.test(url)))];
     if (!unique.length) return;
     const key = pairKey(home, away);
     if (!map[key]) map[key] = [];
@@ -4090,26 +4191,31 @@ function parsePPVTVMatches(payload) {
 
 async function loadPPVTVStreams() {
   if (CFG.enablePPVTV === false) { ppvTVHomeMap = {}; const disabled = document.getElementById('ppvtv-status'); if (disabled) disabled.textContent = 'Disabled'; return 0; }
+  const status = document.getElementById('ppvtv-status');
+  const endpoint = String(CFG.ppvtvMatchesApi || PPVTV_MATCHES_API).trim();
+  if (!/^https:\/\//i.test(endpoint)) { if (status) status.textContent = 'Invalid HTTPS endpoint'; ppvTVHomeMap = {}; return 0; }
+  if (status) status.textContent = 'Loading…';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const endpoint = CFG.ppvtvMatchesApi || PPVTV_MATCHES_API;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-    const res = await fetch(endpoint, { signal: controller.signal });
-    clearTimeout(timeout);
+    const res = await fetch(endpoint + (endpoint.includes('?') ? '&' : '?') + '_ts=' + Date.now(), { signal: controller.signal, cache: 'no-store', headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const payload = await res.json();
     ppvTVHomeMap = parsePPVTVMatches(payload);
     const count = Object.keys(ppvTVHomeMap).length;
-    const status = document.getElementById('ppvtv-status');
-    if (status) status.textContent = (payload?.live || 0) + ' live · ' + (payload?.upcoming || 0) + ' upcoming · ' + count + ' pairs';
-    console.log('[PPVTV] Loaded ' + count + ' match(es)');
+    const live = Number(payload?.live ?? payload?.stats?.live ?? 0);
+    const upcoming = Number(payload?.upcoming ?? payload?.stats?.upcoming ?? 0);
+    if (status) status.textContent = live + ' live · ' + upcoming + ' upcoming · ' + count + ' pairs';
+    console.log('[PPVTV] Loaded ' + count + ' match(es) from ' + endpoint);
     return count;
   } catch (e) {
-    const status = document.getElementById('ppvtv-status');
-    if (status) status.textContent = 'Error: ' + e.message;
-    console.warn('[PPVTV]', e.message);
+    const message = e.name === 'AbortError' ? 'Request timed out' : e.message;
+    if (status) status.textContent = 'Error: ' + message;
+    console.warn('[PPVTV]', message);
     ppvTVHomeMap = {};
     return 0;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -5374,6 +5480,7 @@ function saveLogoOverrides() {
 
 function applyConfigToUI() {
   set('cfg-blogid', CFG.blogId);
+  renderBloggerBlogs();
   set('cfg-clientid', CFG.clientId);
   set('cfg-imgbb', CFG.imgbbKey);
   set('cfg-yt-key', CFG.ytApiKey || '');
@@ -5410,7 +5517,14 @@ function applyConfigToUI() {
 document.addEventListener('DOMContentLoaded', () => {
   loadAll();
   renderAll();
+  renderBloggerBlogs();
   loadFirebaseChannels(false);
+  const startOAuth = () => { if (!initOAuth()) setTimeout(startOAuth, 500); };
+  startOAuth();
+  try {
+    const savedToken = localStorage.getItem(SK_BLOGGER_TOKEN) || localStorage.getItem(SK_BLOGGER_TOKEN_LEGACY);
+    if (savedToken) { accessToken = savedToken; updateAuthUI(true); setTimeout(fetchBloggerInfo, 700); }
+  } catch (e) {}
   if (fullRacesData.length) renderFullRaces(fullRacesData);
   if (CFG.schedEnabled) { document.getElementById('sched-enabled').checked = true; startSched(); }
   set('player-base', CFG.playerBase);
