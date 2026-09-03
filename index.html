@@ -2124,7 +2124,8 @@ const SK_FR = 's803v9_fr';
 const SK_TEMPLATES = 's803v9_templates';
 const SK_DRAFTS = 's803v9_drafts';
 // Match the movie app’s shared-origin session key; keep the old key for migration.
-const SK_BLOGGER_TOKEN = 'bloggerToken';
+// Access tokens are short-lived. Keep only the current tab session; never restore an expired token from localStorage.
+const SK_BLOGGER_SESSION = 's803v9_blogger_session';
 const SK_BLOGGER_TOKEN_LEGACY = 's803v9_blogger_token';
 
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
@@ -2692,7 +2693,7 @@ function initOAuth() {
       callback: response => {
         if (response.error) { toast('Auth error: ' + response.error, 'e'); return; }
         accessToken = response.access_token;
-        try { localStorage.setItem(SK_BLOGGER_TOKEN, accessToken); } catch (e) {}
+        try { sessionStorage.setItem(SK_BLOGGER_SESSION, accessToken); } catch (e) {}
         updateAuthUI(true);
         fetchBloggerInfo();
         toast('Signed in to Blogger ✓', 's');
@@ -2715,15 +2716,20 @@ function handleAuth() {
   bloggerTokenClient.requestAccessToken({ prompt: 'consent' });
 }
 
+function clearBloggerSession(message = '') {
+  accessToken = null;
+  bloggerUser = null;
+  bloggerBlogs = [];
+  try { sessionStorage.removeItem(SK_BLOGGER_SESSION); localStorage.removeItem(SK_BLOGGER_TOKEN_LEGACY); } catch (e) {}
+  updateAuthUI(false);
+  if (message) toast(message, 'w');
+}
+
 function signOut() {
   if (accessToken && window.google?.accounts?.oauth2) {
     try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch (e) {}
   }
-  accessToken = null;
-  bloggerUser = null;
-  bloggerBlogs = [];
-  try { localStorage.removeItem(SK_BLOGGER_TOKEN); localStorage.removeItem(SK_BLOGGER_TOKEN_LEGACY); } catch (e) {}
-  updateAuthUI(false);
+  clearBloggerSession();
   toast('Signed out', 'i');
 }
 
@@ -2767,12 +2773,21 @@ function selectBloggerBlog(blogId) {
 async function fetchBloggerInfo() {
   if (!accessToken) return;
   try {
-    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: 'Bearer ' + accessToken } });
-    if (userResponse.status === 401) throw new Error('Session expired');
-    if (!userResponse.ok) throw new Error('User info HTTP ' + userResponse.status);
-    bloggerUser = await userResponse.json();
+    // Profile data is optional. A profile endpoint failure must not log the user out
+    // when the Blogger token itself is still valid.
+    try {
+      const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: 'Bearer ' + accessToken } });
+      if (userResponse.ok) bloggerUser = await userResponse.json();
+      else console.warn('[Blogger auth] Optional userinfo request:', userResponse.status);
+    } catch (profileError) {
+      console.warn('[Blogger auth] Optional userinfo request:', profileError.message);
+    }
+
     const blogsResponse = await fetch('https://www.googleapis.com/blogger/v3/users/self/blogs', { headers: { Authorization: 'Bearer ' + accessToken } });
-    if (blogsResponse.status === 401) throw new Error('Session expired');
+    if (blogsResponse.status === 401) {
+      clearBloggerSession('Google session expired. Please sign in again.');
+      return;
+    }
     if (!blogsResponse.ok) throw new Error('Blogs HTTP ' + blogsResponse.status);
     const data = await blogsResponse.json();
     bloggerBlogs = Array.isArray(data.items) ? data.items : [];
@@ -2784,8 +2799,7 @@ async function fetchBloggerInfo() {
     toast(bloggerBlogs.length + ' Blogger blog(s) loaded ✓', 's');
   } catch (e) {
     console.warn('[Blogger auth]', e.message);
-    if (/expired|401/i.test(e.message)) signOut();
-    else toast('Could not load Blogger blogs: ' + e.message, 'e');
+    toast('Could not load Blogger blogs: ' + e.message, 'e');
   }
 }
 
@@ -5522,7 +5536,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const startOAuth = () => { if (!initOAuth()) setTimeout(startOAuth, 500); };
   startOAuth();
   try {
-    const savedToken = localStorage.getItem(SK_BLOGGER_TOKEN) || localStorage.getItem(SK_BLOGGER_TOKEN_LEGACY);
+    const savedToken = sessionStorage.getItem(SK_BLOGGER_SESSION);
     if (savedToken) { accessToken = savedToken; updateAuthUI(true); setTimeout(fetchBloggerInfo, 700); }
   } catch (e) {}
   if (fullRacesData.length) renderFullRaces(fullRacesData);
