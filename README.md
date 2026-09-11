@@ -40,6 +40,10 @@ The Compose Article Body now includes the full Event-style template system. Stat
 
 `.github/workflows/pages.yml` deploys the static dashboard to GitHub Pages when enabled for the repository. The repository does not require a build step.
 
+## WordPress site login
+
+The dashboard includes a WordPress connection in **Settings → WordPress Site Login**. Enter the site URL, WordPress username, and an **Application Password** created from the WordPress user profile, then choose **Save & Test**. Truepost validates the credentials against `/wp-json/wp/v2/users/me?context=edit` and shows the connected account in the header. The Application Password is held only in the current browser tab memory; it is not written to local storage, exported configuration, GitHub, or this repository. The WordPress site must expose the REST API and allow cross-origin requests from the deployed dashboard. To disconnect, choose **Disconnect** in the header; refreshing the page also clears the credential.
+
 ## Local checks
 
 Run `node --check scripts/onetv-autopost.mjs` to validate the autoposter syntax. Run `npm run auto-publish` only when the required Blogger and Firebase credentials are intentionally available in the environment. Never commit credentials or make Firebase publicly writable to bypass authentication errors.
