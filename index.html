@@ -2748,6 +2748,21 @@ function wordpressAuthHeader() {
   return 'Basic ' + btoa(`${CFG.wordpressUsername}:${wordpressPassword}`);
 }
 
+async function fetchWordPressCurrentUser(siteUrl) {
+  const routes = [
+    `${siteUrl}/wp-json/wp/v2/users/me?context=edit`,
+    `${siteUrl}/index.php?rest_route=/wp/v2/users/me&context=edit`
+  ];
+  let lastResponse = null;
+  for (const url of routes) {
+    const response = await fetch(url, { headers: { Authorization: wordpressAuthHeader(), Accept: 'application/json' } });
+    const contentType = response.headers.get('content-type') || '';
+    lastResponse = response;
+    if (contentType.includes('application/json')) return response;
+  }
+  return lastResponse;
+}
+
 async function connectWordPress() {
   const siteUrl = normalizeWordPressUrl(v('cfg-wp-url') || CFG.wordpressUrl);
   const username = v('cfg-wp-username') || CFG.wordpressUsername;
@@ -2757,7 +2772,8 @@ async function connectWordPress() {
   CFG.wordpressUsername = username;
   wordpressPassword = password;
   try {
-    const response = await fetch(`${siteUrl}/wp-json/wp/v2/users/me?context=edit`, { headers: { Authorization: wordpressAuthHeader() } });
+    const response = await fetchWordPressCurrentUser(siteUrl);
+    if (!response) throw new Error('No response from WordPress REST API');
     if (!response.ok) throw new Error(response.status === 401 ? 'Invalid username or Application Password' : `WordPress HTTP ${response.status}`);
     wordpressUser = await response.json();
     set('cfg-wp-url', siteUrl);
