@@ -1571,7 +1571,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
         </div>
         <div class="form-row">
           <div><label>Labels</label><input type="text" id="post-labels" value="sports 803,live " oninput="updateSEO()"></div>
-          <div><label>Status</label><select id="post-status"><option value="DRAFT">Draft</option><option value="LIVE">Live</option></select></div>
+          <div><label>Status</label><select id="post-status"><option value="LIVE">Live</option><option value="DRAFT">Draft</option></select></div>
         </div>
         <div class="form-group" id="schedule-dt-wrap" style="display:none">
           <label>Schedule Publish Date &amp; Time <span style="color:var(--gold)">— post goes LIVE at this exact time</span></label>
@@ -2357,6 +2357,55 @@ const LEAGUES = [
   { id: 'motogp', sport: 'racing', slug: 'motogp', name: 'MotoGP', icon: '🏍️', type: 'race' },
   { id: 'cycling', sport: 'cycling', slug: 'world', name: 'Cycling', icon: '🚴', type: 'race' },
   { id: 'mlb', sport: 'baseball', slug: 'mlb', name: 'MLB', icon: '⚾', type: 'match' },
+  // Expanded catalog. Entries without an ESPN slug remain selectable for labeling
+  // and future provider adapters without breaking the current ESPN fetcher.
+  { id: 'acle', sport: 'soccer', slug: null, name: 'AFC Champions League Elite', icon: '🏆', type: 'match' },
+  { id: 'acltwo', sport: 'soccer', slug: null, name: 'AFC Champions League Two', icon: '🏆', type: 'match' },
+  { id: 'afl', sport: 'football', slug: null, name: 'AFL', icon: '🏉', type: 'match' },
+  { id: 'allsvenskan', sport: 'soccer', slug: 'swe.1', name: 'Allsvenskan', icon: '🇸🇪', type: 'match' },
+  { id: 'asianbasket', sport: 'basketball', slug: null, name: "Asian Games - Men's Basketball", icon: '🏀', type: 'match' },
+  { id: 'bcl', sport: 'basketball', slug: null, name: 'Basketball Champions League', icon: '🏀', type: 'match' },
+  { id: 'belgian', sport: 'soccer', slug: 'bel.1', name: 'Belgian Pro League', icon: '🇧🇪', type: 'match' },
+  { id: 'bolivia', sport: 'soccer', slug: 'bol.1', name: 'Bolivian Primera Division', icon: '🇧🇴', type: 'match' },
+  { id: 'brserieb', sport: 'soccer', slug: 'bra.2', name: 'Brazilian Serie B', icon: '🇧🇷', type: 'match' },
+  { id: 'cfa', sport: 'soccer', slug: null, name: 'CFA Member Champions League', icon: '🏆', type: 'match' },
+  { id: 'libertadores', sport: 'soccer', slug: 'conmebol.libertadores', name: 'CONMEBOL Copa Libertadores', icon: '🏆', type: 'match' },
+  { id: 'sudamericana', sport: 'soccer', slug: 'conmebol.sudamericana', name: 'CONMEBOL Copa Sudamericana', icon: '🏆', type: 'match' },
+  { id: 'canadian', sport: 'soccer', slug: null, name: 'Canadian Championship', icon: '🇨🇦', type: 'match' },
+  { id: 'canadianfootball', sport: 'football', slug: null, name: 'Canadian Football', icon: '🏈', type: 'match' },
+  { id: 'colombia', sport: 'soccer', slug: 'col.1', name: 'Categoría Primera A', icon: '🇨🇴', type: 'match' },
+  { id: 'collegefootball', sport: 'football', slug: 'college-football', name: 'College Football', icon: '🏈', type: 'match' },
+  { id: 'coppaitalia', sport: 'soccer', slug: 'ita.coppa_italia', name: 'Coppa Italia', icon: '🇮🇹', type: 'match' },
+  { id: 'eflcup', sport: 'soccer', slug: 'eng.league_cup', name: 'English Football League Cup', icon: '🏆', type: 'match' },
+  { id: 'egypt', sport: 'soccer', slug: 'egy.1', name: 'Egyptian Premier League', icon: '🇪🇬', type: 'match' },
+  { id: 'espnunlimited', sport: 'other', slug: null, name: 'ESPN Unlimited', icon: '📺', type: 'match' },
+  { id: 'fifau20w', sport: 'soccer', slug: null, name: "FIFA U20 Women's World Cup", icon: '🌍', type: 'match' },
+  { id: 'iceland', sport: 'soccer', slug: null, name: 'Iceland Besta-deild karla', icon: '🇮🇸', type: 'match' },
+  { id: 'indonesia', sport: 'soccer', slug: null, name: 'Indonesian Super League', icon: '🇮🇩', type: 'match' },
+  { id: 'israel', sport: 'soccer', slug: 'isr.1', name: 'Israel Premier League', icon: '🇮🇱', type: 'match' },
+  { id: 'latvia', sport: 'soccer', slug: null, name: 'Latvian Higher League', icon: '🇱🇻', type: 'match' },
+  { id: 'ligamx', sport: 'soccer', slug: 'mex.1', name: 'Liga MX', icon: '🇲🇽', type: 'match' },
+  { id: 'lignacionalmx', sport: 'basketball', slug: null, name: 'Liga Nacional de Baloncesto Profesional', icon: '🏀', type: 'match' },
+  { id: 'mexascenso', sport: 'soccer', slug: null, name: 'Mexico Ascenso MX', icon: '🇲🇽', type: 'match' },
+  { id: 'mma', sport: 'mma', slug: 'ufc', name: 'Mixed Martial Arts (MMA)', icon: '🥊', type: 'match' },
+  { id: 'netherlands', sport: 'soccer', slug: 'ned.1', name: 'Netherlands Eredivisie', icon: '🇳🇱', type: 'match' },
+  { id: 'norwaywomen', sport: 'soccer', slug: null, name: "Norwegian Women's 1.Divisjon", icon: '🇳🇴', type: 'match' },
+  { id: 'ocaasian', sport: 'other', slug: null, name: 'OCA Asian Games', icon: '🌏', type: 'match' },
+  { id: 'ekstraklasa', sport: 'soccer', slug: 'pol.1', name: 'PKO Bank Polski EKSTRAKLASA', icon: '🇵🇱', type: 'match' },
+  { id: 'portugal-u23', sport: 'soccer', slug: null, name: 'Portuguese U23 League', icon: '🇵🇹', type: 'match' },
+  { id: 'rugby-nrl', sport: 'rugby', slug: null, name: 'Rugby League (NRL)', icon: '🏉', type: 'match' },
+  { id: 'russian-first', sport: 'soccer', slug: null, name: 'Russian First League', icon: '🇷🇺', type: 'match' },
+  { id: 'russian-premier', sport: 'soccer', slug: null, name: 'Russian Premier League', icon: '🇷🇺', type: 'match' },
+  { id: 'saudi-division1', sport: 'soccer', slug: null, name: 'Saudi Arabia Division 1', icon: '🇸🇦', type: 'match' },
+  { id: 'scottish-championship', sport: 'soccer', slug: 'sco.2', name: 'Scottish Championship', icon: '🏴', type: 'match' },
+  { id: 'scottish-premiership', sport: 'soccer', slug: 'sco.1', name: 'Scottish Premiership', icon: '🏴', type: 'match' },
+  { id: 'superettan', sport: 'soccer', slug: null, name: 'Sweden Superettan', icon: '🇸🇪', type: 'match' },
+  { id: 'switzerland', sport: 'soccer', slug: 'sui.1', name: 'Switzerland Super League', icon: '🇨🇭', type: 'match' },
+  { id: 'turkish-cup', sport: 'soccer', slug: null, name: 'Turkish Cup', icon: '🇹🇷', type: 'match' },
+  { id: 'usl', sport: 'soccer', slug: null, name: 'USL Championship', icon: '🇺🇸', type: 'match' },
+  { id: 'uganda', sport: 'soccer', slug: null, name: 'Uganda Premier League', icon: '🇺🇬', type: 'match' },
+  { id: 'venezuela', sport: 'soccer', slug: null, name: 'Venezuela Primera Division', icon: '🇻🇪', type: 'match' },
+  { id: 'wrestling', sport: 'other', slug: null, name: 'Wrestling', icon: '🤼', type: 'match' },
 ];
 
 const DEFAULT_CHANNELS = [
@@ -3002,6 +3051,16 @@ async function postToBlogger() {
   }
 }
 
+async function publishBloggerPost(postId) {
+  if (!CFG.blogId || !accessToken || !postId) return null;
+  const res = await fetch('https://www.googleapis.com/blogger/v3/blogs/' + CFG.blogId + '/posts/' + postId + '/publish', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) throw new Error('Blogger publish ' + res.status + ': ' + await res.text());
+  return await res.json();
+}
+
 async function postRaw(title, html, status, labels, publishDate = null) {
   if (!CFG.blogId || !accessToken) return null;
   let url = 'https://www.googleapis.com/blogger/v3/blogs/' + CFG.blogId + '/posts/';
@@ -3012,7 +3071,10 @@ async function postRaw(title, html, status, labels, publishDate = null) {
   try {
     const res = await fetch(url, { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!res.ok) throw new Error('Blogger ' + res.status + ': ' + await res.text());
-    return await res.json();
+    const post = await res.json();
+    // Keep the publish transition explicit. This prevents a post with an uploaded image
+    // from being left in draft state when Blogger accepts the insert first.
+    return isLive && !publishDate ? await publishBloggerPost(post.id) : post;
   } catch (e) {
     toast('Post failed: ' + e.message, 'e');
     return null;
@@ -3032,7 +3094,8 @@ async function updateExistingPost(ev, title, html, status, labels, publishDate =
   try {
     const res = await fetch(url, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!res.ok) throw new Error('Blogger PUT ' + res.status + ': ' + await res.text());
-    const post = await res.json();
+    let post = await res.json();
+    if (isLive && !publishDate) post = await publishBloggerPost(post.id);
     const targetEv = ev || currentComposeEv;
     if (targetEv) {
       const thumbUrl = v('compose-thumb-url') || pl?.thumb || null;
@@ -3072,6 +3135,7 @@ async function fetchAllEvents() {
 }
 
 async function fetchLeague(league) {
+  if (!league.slug) return [];
   try {
     const td = v('target-date');
     const dp = td ? '?dates=' + td.replace(/-/g, '') : '';
@@ -5114,7 +5178,10 @@ async function postHighlights() {
         body: JSON.stringify({ kind: 'blogger#post', id: resolvedPostId, blog: { id: CFG.blogId }, title, content: html, labels: getLabels(ev) })
       });
       if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + await res.text());
-      const post = await res.json();
+      let post = await res.json();
+      // Highlights are public updates: explicitly publish the existing post so a
+      // previously-created draft becomes visible in the same click.
+      post = await publishBloggerPost(post.id || resolvedPostId);
       const thumbUpdate = v('hl-thumb-url') || pl?.thumb || null;
       setLog(ev, { postId: post.id, postUrl: post.url || resolvedPostUrl, title, hasHL: true, thumb: thumbUpdate || pl?.thumb || null });
       const manualEl = document.getElementById('hl-manual-post-url');
