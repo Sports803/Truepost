@@ -1485,6 +1485,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
       <button class="btn-gold" onclick="bulkGenThumbs()">🖼️ Bulk Gen Thumbs</button>
       <button class="btn-green" onclick="bulkPostAll()">📤 Bulk Post</button>
       <button class="btn-orange" onclick="fetchAllOneBallHighlights()">🎬 Fetch All HL</button>
+      <button class="btn-purple" onclick="bulkPostHighlights()">📤 Bulk Post Highlights</button>
     </div>
   </div>
   <div class="league-pills" id="league-filter-pills"></div>
@@ -4267,10 +4268,12 @@ async function getAllStreamSourcesForEvent(ev) {
 function buildSports803PlayerUrl(sources) {
   if (!sources || !sources.length) return '';
   const base = (CFG.mediaPlayerBase || 'https://sports803.github.io/player/').replace(/\/$/, '');
-  const mora = sources.find(s => s.type === 'mora' || s.type === 'hls');
+  // OneBall is the primary source. Use the last detected primary source, while
+  // keeping PPVTV/other embeds as encoded fallbacks in their original order.
+  const primary = [...sources].reverse().find(s => ['one', 'oneball', 'mora', 'hls'].includes(s.type));
   const embeds = sources.filter(s => s.type === 'embed');
   const params = [];
-  if (mora?.url) params.push('mora=' + encodeURIComponent(mora.url));
+  if (primary?.url) params.push((['one', 'oneball'].includes(primary.type) ? 'one=' : 'mora=') + (['one', 'oneball'].includes(primary.type) ? primary.url : encodeURIComponent(primary.url)));
   embeds.forEach(s => { if (s.url) params.push('embed=' + encodeURIComponent(s.url)); });
   return params.length ? base + '/?' + params.join('&') : '';
 }
@@ -4366,10 +4369,10 @@ async function loadOneTVStreams() {
         const readName = el => (el?.querySelector('.team-name,[data-team-name],.name')?.textContent || el?.getAttribute('data-team-name') || el?.textContent || '').trim();
         const home = readName(homeEl), away = readName(awayEl);
         if (!home || !away) return;
-        const streamUrl = 'https://hls.live123.fans/live/' + encodeURIComponent(matchId) + '.m3u8';
+        const streamUrl = 'https://oneball.live/live/' + encodeURIComponent(matchId) + '.html';
         const key = pairKey(home, away);
         if (!oneTVHomeMap[key]) oneTVHomeMap[key] = [];
-        if (!oneTVHomeMap[key].some(s => s.url === streamUrl)) oneTVHomeMap[key].push({ url: streamUrl, type: 'mora', source: 'onetv', matchId, home, away });
+        if (!oneTVHomeMap[key].some(s => s.url === streamUrl)) oneTVHomeMap[key].push({ url: streamUrl, type: 'one', source: 'onetv', matchId, home, away });
       });
       const count = Object.keys(oneTVHomeMap).length;
       console.log('[OneTV] Loaded ' + count + ' match(es)');
@@ -4501,11 +4504,11 @@ async function testDDKanquLookup() {
 // ============================================================
 function buildHighlightsPlayerIframe(url) {
   if (!url) return '';
-  const playerBase = CFG.playerBase || 'https://sports803.github.io/player/';
+  const playerBase = (CFG.playerBase || 'https://sports803.github.io/player/').replace(/\/$/, '');
   let src = url;
-  if (!url.includes('?mora=') && !url.includes('&mora=')) {
-    src = playerBase + (playerBase.includes('?') ? '&' : '?') + 'mora=' + encodeURIComponent(url);
-  }
+  const replay = String(url).match(/https?:\/\/oneball\.live\/(?:replay|live)\/[^/?#]+\.html/i);
+  if (replay) src = playerBase + '?one=' + replay[0];
+  else if (!/[?&](?:one|mora)=/i.test(url)) src = playerBase + '?one=' + encodeURI(url);
   return '<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px"><iframe loading="lazy" src="' + src + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:10px" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>';
 }
 
@@ -4601,27 +4604,12 @@ async function searchOneBallHighlights(ev) {
     }
   }
   if (!matchUrl) { toast('No matching replay found on OneBall', 'w'); return null; }
-  let pageHtml = '';
-  for (const p of proxies) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch(p.url(matchUrl), { signal: controller.signal });
-      clearTimeout(timeout);
-      if (res.ok) { pageHtml = await res.text(); if (pageHtml.length > 500) break; }
-    } catch (e) {}
+  const replayId = matchUrl.match(/\/replay\/([^/?#]+)/i)?.[1]?.replace(/\.html$/i, '');
+  if (replayId) {
+    const replayUrl = 'https://oneball.live/replay/' + replayId + '.html';
+    return { url: replayUrl, replayUrl, playerUrl: (CFG.playerBase || 'https://sports803.github.io/player/') + '?one=' + replayUrl, title: home + ' vs ' + away + ' Highlights' };
   }
-  if (!pageHtml) { toast('Could not fetch replay page details', 'e'); return null; }
-  const m = pageHtml.match(/data-url=["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i);
-  if (m) {
-    const rawM3u8 = m[1].replace(/&amp;/g, '&');
-    return {
-      url: rawM3u8,
-      playerUrl: (CFG.playerBase || 'https://sports803.github.io/player/') + '?mora=' + encodeURIComponent(rawM3u8),
-      title: home + ' vs ' + away + ' Highlights'
-    };
-  }
-  toast('No m3u8 stream found on replay page', 'w');
+  toast('Could not identify the OneBall replay ID', 'w');
   return null;
 }
 
@@ -4712,26 +4700,13 @@ async function fetchAllOneBallHighlights() {
       }
     }
     if (matchUrl) {
-      let pageHtml = '';
-      for (const p of proxies) {
-        try {
-          const headers = p.name === 'jina' ? { 'X-Return-Format': 'html' } : {};
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 10000);
-          const res = await fetch(p.url(matchUrl), { headers, signal: controller.signal });
-          clearTimeout(timeout);
-          if (res.ok) { pageHtml = await res.text(); if (pageHtml.length > 500) break; }
-        } catch (e) {}
-      }
-      if (pageHtml) {
-        const m = pageHtml.match(/data-url=["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i);
-        if (m) {
-          const rawM3u8 = m[1].replace(/&amp;/g, '&');
-          const playerUrl = (CFG.playerBase || 'https://sports803.github.io/player/') + '?mora=' + encodeURIComponent(rawM3u8);
-          setLog(ev, { hasHL: true, hlUrl: playerUrl });
-          foundCount++;
-          console.log('[BatchHL] Found for:', home, 'vs', away);
-        }
+      const replayId = matchUrl.match(/\/replay\/([^/?#]+)/i)?.[1]?.replace(/\.html$/i, '');
+      if (replayId) {
+        const replayUrl = 'https://oneball.live/replay/' + replayId + '.html';
+        const playerUrl = (CFG.playerBase || 'https://sports803.github.io/player/') + '?one=' + replayUrl;
+        setLog(ev, { hasHL: true, hlUrl: playerUrl, oneMatchId: replayId, replayUrl });
+        foundCount++;
+        console.log('[BatchHL] Found for:', home, 'vs', away, 'using replay:', replayUrl);
       }
     }
     await new Promise(r => setTimeout(r, 500));
@@ -5124,6 +5099,42 @@ async function genHLText() {
   }
 }
 
+async function bulkPostHighlights() {
+  if (!accessToken || !CFG.blogId) { toast('Sign in and set Blog ID first', 'e'); return; }
+  const finished = allEvents.filter(ev => ev.type === 'match' && ['Final', 'FT', 'Completed', 'Full Time', 'AET', 'Penalties', 'Post', 'Ended', 'Finished'].includes(ev.status));
+  if (!finished.length) { toast('No finished matches found. Fetch events first.', 'w'); return; }
+  const posted = [], updated = [], skipped = [], failed = [];
+  toast('Bulk highlights: processing ' + finished.length + ' finished matches…', 'i');
+  for (const ev of finished) {
+    const label = ev.home.name + ' vs ' + ev.away.name;
+    try {
+      const existing = getLog(ev);
+      const replay = await searchOneBallHighlights(ev);
+      if (!replay?.replayUrl) { skipped.push(label + ' — no replay'); continue; }
+      const title = label + ' – Highlights & Replay | Sports 803';
+      let article = '';
+      try { if (CFG.deepseekKey) article = await callClaude(buildClaudePrompt(label, ev, true)); } catch (e) { console.warn('[BulkHL] AI article failed:', e.message); }
+      if (!article) article = '<h2>' + label + ' Highlights</h2><p>Watch the highlights and relive the key moments from this ' + (ev.league?.name || 'sports') + ' clash.</p>';
+      const html = article + '\n\n' + buildHighlightsPlayerIframe(replay.replayUrl);
+      let post = null;
+      if (existing?.postId) {
+        const res = await fetch('https://www.googleapis.com/blogger/v3/blogs/' + CFG.blogId + '/posts/' + existing.postId, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'blogger#post', id: existing.postId, blog: { id: CFG.blogId }, title, content: html, labels: getLabels(ev) }) });
+        if (!res.ok) throw new Error('Blogger update ' + res.status + ': ' + await res.text());
+        post = await res.json();
+        post = await publishBloggerPost(post.id || existing.postId);
+        updated.push(label);
+      } else {
+        post = await postRaw(title, html, 'LIVE', getLabels(ev), null);
+        if (!post) throw new Error('Blogger returned no post');
+        posted.push(label);
+      }
+      setLog(ev, { postId: post.id, postUrl: post.url || existing?.postUrl || null, status: 'LIVE', title, hasHL: true, hlUrl: replay.playerUrl, replayUrl: replay.replayUrl, oneMatchId: replay.replayUrl.match(/\/replay\/([^/?#]+)/i)?.[1] || null });
+    } catch (e) { failed.push(label + ' — ' + e.message); console.error('[BulkHL] Failed:', label, e); }
+    await new Promise(r => setTimeout(r, 800));
+  }
+  renderEventCards(allEvents); renderPostLog();
+  toast('Bulk highlights complete: ' + updated.length + ' updated, ' + posted.length + ' published, ' + skipped.length + ' skipped, ' + failed.length + ' failed.', failed.length ? 'w' : 's');
+}
 async function postHighlights() {
   const idx = parseInt(document.getElementById('hl-select').value);
   if (isNaN(idx)) { toast('Select an event', 'i'); return; }
