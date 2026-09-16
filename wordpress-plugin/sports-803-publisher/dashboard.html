@@ -2620,23 +2620,40 @@ function saveDraft() {
 // ============================================================
 //  TEMPLATE LIBRARY
 // ============================================================
-const BUILTIN_HIGHLIGHT_TEMPLATES={
-  'Match Overview': ev=>'<h2>Match Overview</h2><p>'+ev.home?.name+' and '+ev.away?.name+' meet in a '+(ev.league?.name||ev.league||'league')+' contest. The result matters for momentum, confidence, and the race for a stronger position in the competition. Supporters can follow the key moments, decisive changes in momentum, and the final outcome in this highlights recap.</p>',
-  'Match Details': ev=>'<h2>Match Details</h2><p><strong>Competition:</strong> '+(ev.league?.name||ev.league||'Sports event')+'<br><strong>Fixture:</strong> '+ev.home?.name+' vs '+ev.away?.name+'<br><strong>Kick-off:</strong> '+(ev.startTime?new Date(ev.startTime).toLocaleString():'scheduled time')+'</p><p>Use the player below to revisit the main action and review the most important phases of the contest.</p>',
-  'Key Moments': ev=>'<h2>Key Moments</h2><p>The match developed through several important phases: an opening period of pressure, a response from the opposition, and a decisive stretch after the interval. The replay lets viewers revisit the chances, saves, goals, set pieces, and turning points that shaped the result.</p>',
-  'Standout Performers': ev=>'<h2>Standout Performers</h2><p>The standout contributions came from the players who created space, defended under pressure, moved the ball quickly, and made important decisions in the final third. This recap focuses on observable moments shown in the replay.</p>',
-  'Result and What It Means': ev=>'<h2>Result and What It Means</h2><p>The final result gives both teams a clear reference point for their next fixture. The winner can build on the performance, while the other side will look to correct the moments that changed the game.</p>',
-  'How To Watch Highlights': ev=>'<h2>How To Watch the Highlights</h2><p>Scroll to the embedded Sports 803 player below and press play. The replay is provided for quick access to the match action, including the most important sequences and decisive moments.</p>'
+const BUILTIN_HIGHLIGHT_TEMPLATES = {
+  'Match Overview': ev => '<h2>Match Overview</h2><p>' + ev.home?.name + ' and ' + ev.away?.name + ' meet in a ' + (ev.league?.name || ev.league || 'league') + ' contest. This recap covers the context, momentum, key moments, and final outcome.</p>',
+  'Match Details': ev => '<h2>Match Details</h2><p><strong>Competition:</strong> ' + (ev.league?.name || ev.league || 'Sports event') + '<br><strong>Fixture:</strong> ' + ev.home?.name + ' vs ' + ev.away?.name + '<br><strong>Kick-off:</strong> ' + (ev.startTime ? new Date(ev.startTime).toLocaleString() : 'scheduled time') + '</p>',
+  'Key Moments': ev => '<h2>Key Moments</h2><p>The replay shows the pressure, chances, saves, goals, set pieces, and turning points that shaped the contest. Review the full player below for every important sequence.</p>',
+  'Standout Performers': ev => '<h2>Standout Performers</h2><p>The most influential contributions came from the players who created space, defended under pressure, moved the ball quickly, and made important decisions in the final third.</p>',
+  'Result and What It Means': ev => '<h2>Result and What It Means</h2><p>The result gives both teams a clear reference point for the next fixture. One side can build on its best spells while the other looks to correct the moments that changed the game.</p>',
+  'How To Watch Highlights': ev => '<h2>How To Watch the Highlights</h2><p>Scroll to the embedded Sports 803 player below and press play to revisit the main action and decisive moments.</p>'
 };
-function highlightTemplateEntries() { return Object.entries(templates).filter(([name,t]) => t && (t.kind === 'highlights' || /highlight|replay|recap/i.test(name))); }
-function refreshHighlightTemplateSelect() { const el=document.getElementById('hl-template-select'); if(!el)return; const built=Object.keys(BUILTIN_HIGHLIGHT_TEMPLATES).map(n=>'<option value="builtin:'+n.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'">Built-in · '+n+'</option>').join(''); const saved=highlightTemplateEntries().map(([n])=>'<option value="'+n.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'">Saved · '+n+'</option>').join(''); el.innerHTML='<option value="">— choose a template instead of AI —</option>'+built+saved; }
-function saveHighlightTemplate() { const name=prompt('Highlight template name', 'Highlights Recap '+(highlightTemplateEntries().length+1)); const body=v('hl-body'); if(!name||!body){toast('Enter highlight text first','w');return} templates[name]={body,kind:'highlights',created:Date.now()}; saveAll(); refreshHighlightTemplateSelect(); renderTemplateList(); toast('Highlight template saved ✓','s'); }
-function loadHighlightTemplate(name) { if(!name)return; const ev=allEvents[parseInt(v('hl-select'))]; if(name.startsWith('builtin:')){const key=name.slice(8);if(ev&&BUILTIN_HIGHLIGHT_TEMPLATES[key]){const html=BUILTIN_HIGHLIGHT_TEMPLATES[key](ev),old=v('hl-body');set('hl-body',old?(old+'
-
-'+html):html);toast('Built-in highlight template added ✓','s')}return} const t=templates[name]; if(t?.body){const old=v('hl-body');set('hl-body',old?(old+'
-
-'+t.body):t.body);toast('Highlight template loaded ✓','s')} }
-
+function highlightTemplateEntries() { return Object.entries(templates).filter(([name, t]) => t && (t.kind === 'highlights' || /highlight|replay|recap/i.test(name))); }
+function refreshHighlightTemplateSelect() {
+  const el = document.getElementById('hl-template-select');
+  if (!el) return;
+  const built = Object.keys(BUILTIN_HIGHLIGHT_TEMPLATES).map(n => '<option value="builtin:' + n.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">Built-in - ' + n + '</option>').join('');
+  const saved = highlightTemplateEntries().map(([n]) => '<option value="' + n.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">Saved - ' + n + '</option>').join('');
+  el.innerHTML = '<option value="">Choose a template instead of AI</option>' + built + saved;
+}
+function saveHighlightTemplate() {
+  const name = prompt('Highlight template name', 'Highlights Recap ' + (highlightTemplateEntries().length + 1));
+  const body = v('hl-body');
+  if (!name || !body) { toast('Enter highlight text first', 'w'); return; }
+  templates[name] = { body, kind: 'highlights', created: Date.now() };
+  saveAll(); refreshHighlightTemplateSelect(); renderTemplateList(); toast('Highlight template saved', 's');
+}
+function loadHighlightTemplate(name) {
+  if (!name) return;
+  const ev = allEvents[parseInt(v('hl-select'))];
+  if (name.startsWith('builtin:')) {
+    const html = ev && BUILTIN_HIGHLIGHT_TEMPLATES[name.slice(8)] ? BUILTIN_HIGHLIGHT_TEMPLATES[name.slice(8)](ev) : '';
+    if (html) { const old = v('hl-body'); set('hl-body', old ? old + '\\n\\n' + html : html); toast('Built-in highlight template added', 's'); }
+    return;
+  }
+  const t = templates[name];
+  if (t?.body) { const old = v('hl-body'); set('hl-body', old ? old + '\\n\\n' + t.body : t.body); toast('Highlight template loaded', 's'); }
+}
 function renderTemplateList() {
   const el = document.getElementById('template-list');
   if (!el) return;
