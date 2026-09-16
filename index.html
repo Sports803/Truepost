@@ -1427,13 +1427,13 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
       </div>
     </div>
     <div class="card">
-      <div class="card-title">🤖 Claude AI Engine
+      <div class="card-title">🤖 AI Content Engine (NVIDIA)
         <span class="ct-right" id="ds-status-badge"><span class="deepseek-badge">NOT CONFIGURED</span></span>
       </div>
-      <div id="ds-engine-status" style="font-size:.76rem;color:var(--muted2)">Add Claude API key in Settings → AI Content to enable AI-written articles.</div>
+      <div id="ds-engine-status" style="font-size:.76rem;color:var(--muted2)">Provider chain: DeepSeek V4 Flash → Nemotron 3 Ultra. Automatic failover.</div>
       <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn-purple btn-xs" onclick="showPage('settings')">⚙ Configure Claude</button>
-        <button class="btn-ghost btn-xs" onclick="testClaude()">🧪 Test Connection</button>
+        <button class="btn-purple btn-xs" onclick="showPage('settings')">⚙ AI Settings</button>
+        <button class="btn-ghost btn-xs" onclick="testAIProviders()">🧪 Test Providers</button>
       </div>
     </div>
     <div class="card">
@@ -1488,6 +1488,10 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
       <button class="btn-purple" onclick="bulkPostHighlights()">📤 Bulk Post Highlights</button>
     </div>
   </div>
+  <div style="background:rgba(230,57,70,.08);border:1px solid rgba(230,57,70,.35);border-radius:9px;padding:10px 14px;margin-bottom:14px;font-size:.75rem">
+    <strong style="color:var(--red);font-family:var(--cond)">⚠ ADSENSE SAFETY:</strong>
+    <span style="color:var(--muted2)">Never publish more than 3 articles per day from this dashboard. Google's "scaled content abuse" policy flags bulk-published AI output.</span>
+  </div>
   <div class="league-pills" id="league-filter-pills"></div>
   <div class="searchbar"><input type="text" id="event-search" placeholder="Search events, teams, leagues…" oninput="filterEvents()"></div>
   <div class="events-grid" id="events-grid" role="list">
@@ -1500,7 +1504,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
     <div style="font-family:var(--cond);font-size:1.4rem;font-weight:900;text-transform:uppercase">Compose <span style="color:var(--red)">Post</span></div>
     <div style="display:flex;gap:7px">
-      <button class="btn-purple" onclick="generateWithClaude()" id="ds-gen-btn">🤖 AI Write</button>
+      <button class="btn-purple" onclick="generateWithAI()" id="ds-gen-btn">🤖 AI Write</button>
       <button class="btn-red" onclick="postToBlogger()" id="compose-publish-btn">📤 Publish</button>
       <button class="btn-ghost" onclick="previewPost()">👁 Preview</button>
       <button class="btn-ghost btn-sm" onclick="saveDraft()">💾 Save Draft</button>
@@ -1514,7 +1518,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
   </div>
   <div id="ai-writing-banner" style="display:none" class="ai-writing-indicator">
     <div class="ai-dot"></div>
-    <span style="font-family:var(--cond);font-size:.8rem;font-weight:700">Claude AI is writing your article…</span>
+    <span style="font-family:var(--cond);font-size:.8rem;font-weight:700">🤖 AI is writing your article…</span>
     <span id="ai-writing-dots" style="font-family:var(--mono);font-size:.75rem;color:var(--purple)"></span>
   </div>
   <div class="compose-layout">
@@ -1916,6 +1920,12 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
 <!-- ========== SETTINGS ========== -->
 <div class="page" id="page-settings">
   <div style="font-family:var(--cond);font-size:1.4rem;font-weight:900;text-transform:uppercase;margin-bottom:16px"><span style="color:var(--red)">Settings</span></div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">📋 AdSense Pre-Flight Checklist</div>
+    <ul style="font-size:.75rem;line-height:1.7;color:var(--muted2);padding-left:18px">
+      <li>☐ /about page exists and names the site owner</li><li>☐ /contact page exists with a real email</li><li>☐ /privacy-policy page exists (AdSense requirement)</li><li>☐ /terms page exists</li><li>☐ Each article has an author byline and a visible publish date</li><li>☐ Stream iframes are on a separate domain from the monetized blog</li><li>☐ Last 30 days: avg &lt; 3 posts/day, each human-reviewed</li><li>☐ No article contains invented statistics</li>
+    </ul>
+  </div>
   <div class="settings-grid">
     <div class="card">
       <div class="card-title">Blogger / Google OAuth</div>
@@ -1941,20 +1951,20 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
       <button class="btn-red btn-sm" onclick="saveCFG()">💾 Save</button>
     </div>
     <div class="card" style="grid-column:1/-1;border-color:rgba(114,9,183,.3)">
-      <div class="card-title" style="color:#b47ffa">🤖 Claude AI Content Engine
+      <div class="card-title" style="color:#b47ffa">🤖 AI Content Engine (NVIDIA NIM)
         <span class="ct-right"><span id="ds-cfg-badge" class="deepseek-badge">NOT CONFIGURED</span></span>
       </div>
       <div style="background:rgba(114,9,183,.06);border:1px solid rgba(114,9,183,.2);border-radius:8px;padding:12px;margin-bottom:12px;font-size:.78rem">
-        <strong style="color:#b47ffa;font-family:var(--cond)">Why Claude?</strong>
-        <span style="color:var(--muted2)"> Anthropic Claude API · Writes detailed match previews &amp; highlights · Excellent SEO · Context-aware articles using team names, league, score, and kickoff time.</span>
+        <strong style="color:#b47ffa;font-family:var(--cond)">Why NVIDIA NIM?</strong>
+        <span style="color:var(--muted2)"> DeepSeek V4 Flash + Nemotron 3 Ultra fallback chain · Context-aware match previews · Automatic failover if one provider is down.</span>
       </div>
       <div class="form-row">
         <div>
-          <label>Claude API Key</label>
-          <input type="password" id="cfg-deepseek-key" placeholder="sk-ant-…" oninput="onClaudeKeyChange()">
+          <label>API Key (optional — keys built in)</label>
+          <input type="password" id="cfg-deepseek-key" placeholder="Optional override key" oninput="updateAIStatusBadge()"><p style="font-size:.68rem;color:var(--muted2);margin-top:5px">Built-in keys are used automatically. The input above only overrides them.</p>
         </div>
         <div>
-          <label>Claude Model</label>
+          <label>Preferred Model</label>
           <select id="cfg-deepseek-model" onchange="saveCFG()">
             <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (best quality)</option>
             <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fast &amp; cheap)</option>
@@ -1975,8 +1985,8 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
         </select>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-purple btn-sm" onclick="saveCFG()">💾 Save Claude Settings</button>
-        <button class="btn-ghost btn-sm" onclick="testClaude()">🧪 Test Connection</button>
+        <button class="btn-purple btn-sm" onclick="saveCFG()">💾 Save AI Settings</button>
+        <button class="btn-ghost btn-sm" onclick="testAIProviders()">🧪 Test Providers</button>
       </div>
       <div id="ds-test-result" style="font-size:.72rem;color:var(--muted2);margin-top:8px;font-family:var(--mono);min-height:14px"></div>
     </div>
@@ -2174,8 +2184,7 @@ const SK_BLOGGER_TOKEN_LEGACY = 's803v9_blogger_token';
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
 const TSDB = 'https://www.thesportsdb.com/api/v1/json/3';
 const PPVTV_MATCHES_API = 'https://august.ppvtv.icu/api/matches.json';
-const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
-const EVENT_BUILTIN_CLIENT_ID = '548443260529-rad10kv6bh61bqclcl290hh5rmmptve8.apps.googleusercontent.com';
+const EVENT_BUILTIN_CLIENT_ID = '548443260529-rad10kv6bh61bqclcl290hh5rmmptve.apps.googleusercontent.com';
 const LEGACY_EVENT_CLIENT_ID = '55046129292-15h9k5ga0lr1e3p3ptqg1iueeks49f7v.apps.googleusercontent.com';
 const EVENT_FIREBASE_DATABASE_URL = 'https://sports-803-1b806-default-rtdb.firebaseio.com';
 const EVENT_FIREBASE_EVENTS_PATH = 's803config/todaysMatches';
@@ -2194,7 +2203,7 @@ let CFG = {
   firebaseChannelsPath: EVENT_FIREBASE_CHANNELS_PATH,
   autoFetchStreams: false, enableDdkanqu: false, enableOneTV: false, enablePPVTV: true, embedStreamsInPost: true,
   ddkanquMappingsRaw: '',
-  deepseekKey: '', deepseekModel: 'claude-sonnet-4-20250514', deepseekTone: '', deepseekLength: 'medium',
+  deepseekKey: '', deepseekModel: 'deepseek-ai/deepseek-v4-flash-0731', deepseekTone: '', deepseekLength: 'medium',
   ytApiKey: ''
 };
 let LOGO_OVERRIDES = {}, LOGO_CACHE = {};
@@ -2221,6 +2230,7 @@ function evKey(ev) { return (ev.league?.id || '') + '|' + (ev.home?.name || ev.n
 function getLog(ev) { return postLog[evKey(ev)] || null; }
 function setLog(ev, data) { postLog[evKey(ev)] = { ...(postLog[evKey(ev)] || {}), ...data, ts: Date.now() }; saveAll(); updateStats(); }
 function findEv(sid) { const id = decodeURIComponent(String(sid)); return allEvents.find(e => String(e.id) === id) || allEvents.find(e => String(e.id) === String(sid)) || null; }
+// Used only by legacy decorative/non-article UI helpers; never used in article-content generation.
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 
 // ----- DEBOUNCE HELPER -----
@@ -2291,7 +2301,7 @@ function saveCFG() {
   CFG.deepseekLength = document.getElementById('cfg-deepseek-length')?.value || 'medium';
   ddkanquMappings = parseDDKMappings(CFG.ddkanquMappingsRaw);
   saveAll();
-  updateClaudeStatus();
+  updateAIStatusBadge();
   toast('Settings saved ✓', 's');
 }
 
@@ -2446,28 +2456,28 @@ const Compose = {
         html = `<h2>Match Details</h2><p>🏆 Competition: ${ev.league?.name}<br>🕐 Kickoff: ${ev.startTime ? ev.startTime.toLocaleString() : 'TBD'}</p>`;
         break;
       case 'form':
-        html = `<h2>Recent Form</h2><p><strong>${h}:</strong> Coming off a strong run of results.<br><strong>${a}:</strong> Looking to bounce back from recent setbacks.</p>`;
+        html = `<h2>Recent Form</h2><p><strong>${h}</strong> and <strong>${a}</strong> form must be filled in by the editor using verified recent results before publishing.</p>`;
         break;
       case 'h2h':
-        html = `<h2>Head-to-Head</h2><p>These two sides have met ${Math.floor(Math.random()*30+10)} times in recent history. The home side has won ${Math.floor(Math.random()*15+3)} matches, away ${Math.floor(Math.random()*12+2)}, with ${Math.floor(Math.random()*6+2)} draws.</p>`;
+        html = `<h2>Head-to-Head</h2><p>Add head-to-head context here — pull the real record from a trusted source before publishing. Sports 803 does not publish estimated statistics.</p>`;
         break;
       case 'keyPlayers':
         html = `<h2>Key Players to Watch</h2><p>🔴 ${h}: The main attacking threat, with pace and finishing ability.<br>🔵 ${a}: The midfield engine, dictating play with precise passing.</p>`;
         break;
       case 'analysis':
-        html = `<h2>Match Analysis</h2><p>Expect a tactical battle. ${h} will look to control possession while ${a} pose a threat on the counter-attack.</p>`;
+        html = `<h2>Match Analysis</h2><p>Tactical notes go here — replace before publishing. No invented formations or player instructions.</p>`;
         break;
       case 'liveEvents':
-        html = `<h2>Live Match Events</h2><p>⏱️ Kickoff<br>⚽ Goal! (${Math.floor(Math.random()*20+10)}')<br>🟨 Yellow card<br>⚽ Goal! (${Math.floor(Math.random()*20+30)}')</p>`;
+        html = `<h2>Live Match Events</h2><p>Log actual match events (goals, cards, substitutions) with real timestamps as they happen.</p>`;
         break;
       case 'result':
-        html = `<h2>Full-Time Result</h2><p><strong>${h} ${ev.home?.score || '0'} – ${ev.away?.score || '0'} ${a}</strong></p>`;
+        html = ev.home?.score !== '' ? `<h2>Full-Time Result</h2><p><strong>${h} ${ev.home.score} – ${ev.away.score} ${a}</strong></p>` : `<h2>Full-Time Result</h2><p>Full-time result — pending</p>`;
         break;
       case 'recap':
         html = `<h2>Match Recap</h2><p>A tense encounter that saw both teams create chances. The game was decided by a moment of brilliance in the second half.</p>`;
         break;
       case 'stats':
-        html = `<h2>Match Statistics</h2><p>Possession: ${h} 52% – 48% ${a}<br>Shots: ${h} 14 – 10 ${a}<br>Corners: ${h} 7 – 4 ${a}</p>`;
+        html = `<h2>Match Statistics</h2><p>Replace this block with verified match statistics sourced after full-time.</p>`;
         break;
       case 'implications':
         html = `<h2>What This Result Means</h2><p>This result has major implications for the league table. Both teams now look ahead to their next fixtures.</p>`;
@@ -2531,80 +2541,127 @@ const Compose = {
 };
 
 // ============================================================
-//  CLAUDE AI ENGINE
+//  AI CONTENT ENGINE (NVIDIA NIM)
 // ============================================================
-function updateClaudeStatus() {
-  const hasKey = !!CFG.deepseekKey;
+const NVIDIA_API = 'https://integrate.api.nvidia.com/v1/chat/completions';
+// ⚠️ Rotate these keys — they ship in the page.
+const AI_PROVIDERS = [
+  { name: 'DeepSeek V4 Flash', key: 'nvapi-REPLACE_ME_1', model: 'deepseek-ai/deepseek-v4-flash-0731', thinking: false, timeout: 90000 },
+  { name: 'Nemotron 3 Ultra', key: 'nvapi-REPLACE_ME_2', model: 'nvidia/nemotron-3-ultra-550b-a55b', thinking: false, timeout: 90000 }
+];
+let AI_LAST_PROVIDER = '';
+let AI_LAST_ERROR = '';
+const AI_FAILED_AT = {};
+const AI_COOLDOWN_MS = 60000;
+
+function updateAIStatusBadge() {
+  const first = AI_PROVIDERS[0]?.name || 'AI';
   const badge1 = document.getElementById('ds-status-badge');
   const badge2 = document.getElementById('ds-cfg-badge');
   const statusEl = document.getElementById('ds-engine-status');
-  if (hasKey) {
-    if (badge1) badge1.innerHTML = '<span class="deepseek-badge" style="background:rgba(114,9,183,.25);color:#b47ffa">✓ READY</span>';
-    if (badge2) { badge2.textContent = '✓ CONFIGURED'; badge2.style.background = 'rgba(114,9,183,.25)'; badge2.style.color = '#b47ffa'; }
-    if (statusEl) statusEl.innerHTML = 'Claude AI is configured — click <strong style="color:#b47ffa">🤖 AI Write</strong> in Compose to generate articles.';
-  } else {
-    if (badge1) badge1.innerHTML = '<span class="deepseek-badge">NOT CONFIGURED</span>';
-    if (badge2) { badge2.textContent = 'NOT CONFIGURED'; badge2.style.background = ''; badge2.style.color = ''; }
-    if (statusEl) statusEl.textContent = 'Add Claude API key in Settings → AI Content to enable AI-written articles.';
-  }
-  const btn = document.getElementById('ds-gen-btn'); if (btn) btn.style.opacity = hasKey ? '1' : '0.5';
+  const badge = '<span class="deepseek-badge" style="background:rgba(114,9,183,.25);color:#b47ffa">✓ ' + first + '</span>';
+  if (badge1) badge1.innerHTML = badge;
+  if (badge2) { badge2.textContent = '✓ ' + first; badge2.style.background = 'rgba(114,9,183,.25)'; badge2.style.color = '#b47ffa'; }
+  if (statusEl) statusEl.innerHTML = AI_LAST_PROVIDER
+    ? 'Last used: <strong style="color:#b47ffa">' + AI_LAST_PROVIDER + '</strong>. Provider chain active.'
+    : AI_LAST_ERROR
+      ? 'Fallback chain reported errors — see console.'
+      : 'Provider chain ready: DeepSeek V4 Flash → Nemotron 3 Ultra.';
+  const btn = document.getElementById('ds-gen-btn'); if (btn) btn.style.opacity = '1';
 }
 
-async function testClaude() {
-  const key = CFG.deepseekKey || v('cfg-deepseek-key');
-  const res = document.getElementById('ds-test-result');
-  if (!key) { if (res) res.textContent = '⚠ No API key configured.'; toast('Add your Claude API key first', 'w'); return; }
-  if (res) res.textContent = 'Testing connection…';
-  toast('Testing Claude connection…', 'i');
-  try {
-    const r = await fetch(CLAUDE_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-4-20250514', max_tokens: 30, messages: [{ role: 'user', content: 'Reply only: "Sports 803 Claude OK"' }] })
-    });
-    const d = await r.json();
-    if (d.content?.[0]) { if (res) res.textContent = '✓ Connected: ' + d.content[0].text; toast('Claude AI connected ✓', 's'); }
-    else { if (res) res.textContent = '✗ Error: ' + (d.error?.message || JSON.stringify(d)); toast('Claude error — check key', 'e'); }
-  } catch (e) { if (res) res.textContent = '✗ Network error: ' + e.message; toast('Connection failed', 'e'); }
+async function callAI(prompt, opts = {}) {
+  const errors = [];
+  for (const p of AI_PROVIDERS) {
+    const failedAt = AI_FAILED_AT[p.name] || 0;
+    if (failedAt && Date.now() - failedAt < AI_COOLDOWN_MS) {
+      errors.push(p.name + ': cooling down after a recent failure');
+      continue;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), p.timeout);
+    try {
+      const response = await fetch(NVIDIA_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + p.key, 'Accept': 'application/json' },
+        body: JSON.stringify({ model: p.model, messages: [{ role: 'user', content: prompt }], temperature: opts.temperature ?? 0.8, top_p: opts.topP ?? 0.95, max_tokens: opts.maxTokens || 3000, stream: false }),
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + (await response.text()).slice(0, 240));
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string' || content.length < 80) throw new Error('Response content was missing or too short');
+      AI_LAST_PROVIDER = p.name;
+      AI_LAST_ERROR = '';
+      delete AI_FAILED_AT[p.name];
+      updateAIStatusBadge();
+      console.log('[AI] ✓ ' + p.name + ' — ' + content.length + ' chars. Reminder: review before publishing.');
+      return content;
+    } catch (error) {
+      AI_FAILED_AT[p.name] = Date.now();
+      const message = error?.name === 'AbortError' ? 'timeout after ' + p.timeout + 'ms' : (error?.message || String(error));
+      errors.push(p.name + ': ' + message);
+      console.warn('[AI] ' + p.name + ' failed: ' + message);
+    } finally { clearTimeout(timer); }
+  }
+  AI_LAST_ERROR = errors.join('\n  • ');
+  updateAIStatusBadge();
+  throw new Error('All AI providers failed:\n  • ' + errors.join('\n  • '));
 }
+
+async function testAIProviders() {
+  const res = document.getElementById('ds-test-result');
+  if (res) res.textContent = 'Testing providers…';
+  toast('Testing NVIDIA NIM providers…', 'i');
+  const lines = [];
+  for (const p of AI_PROVIDERS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const r = await fetch(NVIDIA_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + p.key, 'Accept': 'application/json' },
+        body: JSON.stringify({ model: p.model, messages: [{ role: 'user', content: 'Reply with exactly: SPORTS803 OK' }], max_tokens: 20, temperature: 0.2, stream: false }),
+        signal: controller.signal
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + (await r.text()).slice(0, 160));
+      const d = await r.json();
+      const reply = d?.choices?.[0]?.message?.content;
+      if (typeof reply !== 'string' || !reply.trim()) throw new Error('Empty response');
+      lines.push('✓ ' + p.name + ': ' + reply.trim());
+    } catch (e) { lines.push('✗ ' + p.name + ': ' + (e?.name === 'AbortError' ? 'timeout' : e.message)); }
+    finally { clearTimeout(timer); }
+  }
+  if (res) res.textContent = lines.join('\n');
+  if (lines.some(line => line.startsWith('✓'))) toast('Provider test complete ✓', 's'); else toast('All provider tests failed', 'e');
+}
+
+const testClaude = testAIProviders;
+function updateClaudeStatus() { updateAIStatusBadge(); }
 
 const DS_LENGTH_WORDS = { short: 300, medium: 600, long: 1000, xl: 1500 };
-function buildClaudePrompt(title, ev, isHighlights = false) {
+function buildAIPrompt(title, ev, isHighlights = false) {
   const words = DS_LENGTH_WORDS[CFG.deepseekLength] || 600;
   const tone = CFG.deepseekTone || 'enthusiastic sports journalist';
   const player = CFG.playerBase || 'https://sports803.github.io/player/';
+  const strict = '\nSTRICT RULES:\n- Do NOT invent statistics, scores, possession percentages, head-to-head records, player names, injuries, or quotes that are not supplied to you below.\n- If you do not know a fact, write around it — omit the sentence rather than fabricate.\n- Only HTML tags (<h2>, <h3>, <p>, <strong>, <ul>, <li>, <a>). No markdown. No <html>, <head>, or <body>.\n- Vary sentence structure and paragraph length; avoid formulaic openings.';
   if (isHighlights && ev && ev.type === 'match') {
     const h = ev.home.name, a = ev.away.name, lg = ev.league.name;
     const score = ev.home.score !== '' ? h + ' ' + ev.home.score + '–' + ev.away.score + ' ' + a : '';
-    return 'You are a ' + tone + ' writing for Sports 803, a free sports streaming blog.\nWrite a highlights recap article for: ' + h + ' vs ' + a + ' — ' + lg + '.\n' + (score ? 'Final score: ' + score + '.\n' : '') + 'Requirements:\n- Approximately 400 words\n- HTML formatted: use <h2>, <p>, <strong>, <ul><li> tags\n- Sections: Match Summary, Key Moments, Standout Performers, What The Result Means\n- End with: <p>📺 <strong>Watch the ' + h + ' vs ' + a + ' highlights FREE on Sports 803</strong>: <a href="' + player + '">' + player + '</a></p>\n- No markdown, only HTML tags\n- Do not include DOCTYPE or body tags, only the article HTML';
+    return 'You are a ' + tone + ' writing for Sports 803, a free sports streaming blog.\nWrite a highlights recap article for: ' + h + ' vs ' + a + ' — ' + lg + '.\n' + (score ? 'Final score: ' + score + '.\n' : '') + 'Requirements:\n- Approximately 400 words\n- HTML formatted: use <h2>, <p>, <strong>, <ul><li> tags\n- Sections: Match Summary, Key Moments, Standout Performers, What The Result Means\n- End with: <p>📺 <strong>Watch the ' + h + ' vs ' + a + ' highlights FREE on Sports 803</strong>: <a href="' + player + '">' + player + '</a></p>\n- No markdown, only HTML tags\n- Do not include DOCTYPE or body tags, only the article HTML' + strict;
   }
   if (!ev || ev.type === 'race') {
-    const name = ev?.name || title;
-    const league = ev?.league?.name || 'Motorsport';
+    const name = ev?.name || title, league = ev?.league?.name || 'Motorsport';
     const ts = ev?.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : 'this weekend';
-    return 'You are a ' + tone + ' writing for Sports 803, a free sports streaming blog.\nWrite a detailed race/event preview article for: "' + name + '" (' + league + ').\nEvent date/time: ' + ts + '.\nRequirements:\n- Approximately ' + words + ' words\n- HTML formatted: use <h2>, <p>, <strong>, <ul><li> tags\n- Sections: Event Overview, What To Watch, Key Competitors, How To Watch\n- End with: <p>📺 <strong>Watch FREE on Sports 803</strong> — no sign-up required: <a href="' + player + '">' + player + '</a></p>\n- No markdown, only HTML tags\n- Do not include DOCTYPE or body tags, only the article HTML';
+    return 'You are a ' + tone + ' writing for Sports 803, a free sports streaming blog.\nWrite a detailed race/event preview article for: "' + name + '" (' + league + ').\nEvent date/time: ' + ts + '.\nRequirements:\n- Approximately ' + words + ' words\n- HTML formatted: use <h2>, <p>, <strong>, <ul><li> tags\n- Sections: Event Overview, What To Watch, Key Competitors, How To Watch\n- End with: <p>📺 <strong>Watch FREE on Sports 803</strong> — no sign-up required: <a href="' + player + '">' + player + '</a></p>\n- No markdown, only HTML tags\n- Do not include DOCTYPE or body tags, only the article HTML' + strict;
   }
   const h = ev.home.name, a = ev.away.name, lg = ev.league.name;
   const ts = ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : 'today';
-  return 'You are a ' + tone + ' writing for Sports 803, a free sports streaming blog.\nWrite a detailed match preview article for: ' + h + ' vs ' + a + ' — ' + lg + '.\nKickoff: ' + ts + '.\nRequirements:\n- Approximately ' + words + ' words\n- HTML formatted: use <h2>, <p>, <strong>, <ul><li> tags\n- Sections: Match Overview, Current Form, Key Players To Watch, Head-to-Head History, Predicted Lineups & Tactics, Match Prediction\n- Include realistic tactical analysis and form assessment\n- End with: <p>📺 <strong>Watch ' + h + ' vs ' + a + ' FREE on Sports 803</strong> — no sign-up required: <a href="' + player + '">' + player + '</a></p>\n- No markdown, only HTML tags\n- Do not include DOCTYPE or body tags, only the article HTML';
+  return 'You are a ' + tone + ' writing for Sports 803, a free sports streaming blog.\nWrite a detailed match preview article for: ' + h + ' vs ' + a + ' — ' + lg + '.\nKickoff: ' + ts + '.\nRequirements:\n- Approximately ' + words + ' words\n- HTML formatted: use <h2>, <p>, <strong>, <ul><li> tags\n- Sections: Match Overview, Current Form, Key Players To Watch, Head-to-Head History, Predicted Lineups & Tactics, Match Prediction\n- Include tactical analysis ONLY where the supplied context supports it.\n- End with: <p>📺 <strong>Watch ' + h + ' vs ' + a + ' FREE on Sports 803</strong> — no sign-up required: <a href="' + player + '">' + player + '</a></p>\n- No markdown, only HTML tags\n- Do not include DOCTYPE or body tags, only the article HTML' + strict;
 }
 
-async function callClaude(prompt) {
-  const key = CFG.deepseekKey;
-  if (!key) throw new Error('No Claude API key configured');
-  const r = await fetch(CLAUDE_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-4-20250514', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
-  });
-  if (!r.ok) { const e = await r.text(); throw new Error('Claude API error ' + r.status + ': ' + e); }
-  const d = await r.json();
-  if (d.error) throw new Error(d.error.message);
-  return d.content?.[0]?.text || '';
-}
-
-async function generateWithClaude() {
-  if (!CFG.deepseekKey) { toast('Add your Claude API key in Settings first', 'w'); showPage('settings'); return; }
+const generateWithClaude = generateWithAI;
+async function generateWithAI() {
   const title = v('post-title');
   if (!title) { toast('Enter a post title first', 'w'); return; }
   const banner = document.getElementById('ai-writing-banner');
@@ -2613,17 +2670,14 @@ async function generateWithClaude() {
   let dots = '';
   const dotsTimer = setInterval(() => { dots = dots.length >= 3 ? '' : dots + '.'; const el = document.getElementById('ai-writing-dots'); if (el) el.textContent = dots; }, 400);
   try {
-    const prompt = buildClaudePrompt(title, currentComposeEv);
-    const article = await callClaude(prompt);
+    const article = await callAI(buildAIPrompt(title, currentComposeEv));
     bodyEl.value = article;
     updateSEO();
-    toast('✓ Article written by Claude AI', 's');
+    toast('✓ Article written by AI', 's');
   } catch (e) {
-    toast('Claude error: ' + e.message, 'e');
-  } finally {
-    clearInterval(dotsTimer);
-    banner.style.display = 'none';
-  }
+    bodyEl.value = '';
+    toast('AI providers unavailable — draft left blank. Retry or write manually.', 'e');
+  } finally { clearInterval(dotsTimer); banner.style.display = 'none'; }
 }
 
 // ============================================================
@@ -3896,7 +3950,7 @@ async function genAndFill(sid) {
   updateSEO();
   showPage('compose');
   onTitleChange();
-  toast(CFG.deepseekKey ? (fin ? 'Highlights article written by Claude AI ✓' : 'Article written by Claude AI ✓') : 'Content generated ✓', 's');
+  toast(CFG.deepseekKey ? (fin ? 'Highlights article written by AI ✓' : 'Article written by AI ✓') : 'Content generated ✓', 's');
   if (CFG.autoFetchStreams && ev.type === 'match') populateComposeStreams(ev);
 }
 
@@ -3976,6 +4030,13 @@ async function quickPostEv(sid) {
 }
 
 async function bulkPostAll() {
+  const ok = confirm(
+    '⚠️ BULK AUTO-POST WARNING\n\n' +
+    'Google AdSense rejects sites that publish many AI articles in one batch.\n' +
+    'Publish 1–3 reviewed posts per day instead.\n\n' +
+    'Continue anyway?'
+  );
+  if (!ok) return;
   if (!accessToken) { toast('Sign in first', 'e'); return; }
   const toPost = allEvents.filter(ev => !getLog(ev)?.postId);
   if (!toPost.length) { toast('All events already posted', 'i'); return; }
@@ -4988,16 +5049,14 @@ async function quickPostRace(id) {
 }
 
 async function buildRaceArticleBody(race) {
-  if (CFG.deepseekKey) {
-    try {
+  try {
       const words = { short: 300, medium: 600, long: 1000, xl: 1500 }[CFG.deepseekLength] || 600;
       const tone = CFG.deepseekTone || 'enthusiastic sports journalist';
       const player = (CFG.mediaPlayerBase || CFG.playerBase || 'https://sports803.github.io/player/').replace(/\/$/, '');
       const prompt = 'You are a ' + tone + ' writing for Sports 803.\nWrite a full race replay article for: "' + race.title + '".\n' + (race.dateStr ? 'Race date: ' + race.dateStr + '.\n' : '') + (race.sportSlug ? 'Sport: ' + race.sportSlug + '.\n' : '') + 'Requirements:\n- ~' + words + ' words\n- HTML format: use <h2>, <p>, <strong>, <ul><li>\n- Sections: Race Overview, Key Moments, Championship Impact, How To Watch\n- End with: <p>📺 Watch the full race replay FREE on Sports 803: <a href="' + player + '">' + player + '</a></p>\n- Only article HTML, no DOCTYPE or body tags';
-      const article = await callClaude(prompt);
+      const article = await callAI(prompt);
       if (article && article.length > 100) return article;
-    } catch (e) { console.warn('[Claude race article]', e.message); }
-  }
+    } catch (e) { console.warn('[AI race article]', e.message); }
   const player = (CFG.mediaPlayerBase || CFG.playerBase || 'https://sports803.github.io/player/').replace(/\/$/, '');
   return '<h2>' + race.title + '</h2>\n<p>Watch the full race replay of <strong>' + race.title + '</strong>' + (race.dateStr ? ' from ' + race.dateStr : '') + ' free on Sports 803. ' + (race.sportSlug ? race.sportSlug.toUpperCase() + ' races are available in full HD replay — ' : '') + 'no subscription required.</p>\n<h2>How To Watch</h2>\n<p>Use the player below to stream the full race. Multiple sources are available — switch between them if one doesn\'t load.</p>\n<p>📺 Watch FREE on Sports 803: <a href="' + player + '">' + player + '</a></p>';
 }
@@ -5089,17 +5148,24 @@ async function genHLText() {
   toast('Generating highlights text…', 'i');
   const body = document.getElementById('hl-body');
   try {
-    const prompt = buildClaudePrompt(title, ev, true);
-    const article = await callClaude(prompt);
+    const prompt = buildAIPrompt(title, ev, true);
+    const article = await callAI(prompt);
     body.value = article;
     toast('Highlights text generated ✓', 's');
   } catch (e) {
-    body.value = '<h2>' + title + ' Highlights</h2><p>A dramatic encounter that delivered on all fronts. Both teams gave their all, and the result reflects the fine margins at this level.</p>';
-    toast('Fallback text generated', 's');
+    body.value = '';
+    toast('AI providers unavailable — draft left blank. Retry or write manually.', 'e');
   }
 }
 
 async function bulkPostHighlights() {
+  const ok = confirm(
+    '⚠️ BULK AUTO-POST WARNING\n\n' +
+    'Google AdSense rejects sites that publish many AI articles in one batch.\n' +
+    'Publish 1–3 reviewed posts per day instead.\n\n' +
+    'Continue anyway?'
+  );
+  if (!ok) return;
   if (!accessToken || !CFG.blogId) { toast('Sign in and set Blog ID first', 'e'); return; }
   const finished = allEvents.filter(ev => ev.type === 'match' && ['Final', 'FT', 'Completed', 'Full Time', 'AET', 'Penalties', 'Post', 'Ended', 'Finished'].includes(ev.status));
   if (!finished.length) { toast('No finished matches found. Fetch events first.', 'w'); return; }
@@ -5113,8 +5179,7 @@ async function bulkPostHighlights() {
       if (!replay?.replayUrl) { skipped.push(label + ' — no replay'); continue; }
       const title = label + ' – Highlights & Replay | Sports 803';
       let article = '';
-      try { if (CFG.deepseekKey) article = await callClaude(buildClaudePrompt(label, ev, true)); } catch (e) { console.warn('[BulkHL] AI article failed:', e.message); }
-      if (!article) article = '<h2>' + label + ' Highlights</h2><p>Watch the highlights and relive the key moments from this ' + (ev.league?.name || 'sports') + ' clash.</p>';
+      try { article = await callAI(buildAIPrompt(label, ev, true)); } catch (e) { console.warn('[BulkHL] AI article failed:', e.message); skipped.push(label + ' — AI unavailable; review manually'); continue; }
       const html = article + '\n\n' + buildHighlightsPlayerIframe(replay.replayUrl);
       let post = null;
       if (existing?.postId) {
@@ -5589,7 +5654,7 @@ function previewPost() { document.getElementById('preview-title').textContent = 
 //  BUILD ARTICLE WITH STREAMS (with race support)
 // ============================================================
 async function buildArticleWithStreams(title, ev, isHighlights = false) {
-  const base = await buildArticleWithClaude(title, ev, isHighlights);
+  const base = await buildArticleWithAI(title, ev, isHighlights);
   if (!CFG.autoFetchStreams || CFG.embedStreamsInPost === false || !ev) return base;
   try {
     const sources = await getAllStreamSourcesForEvent(ev);
@@ -5598,53 +5663,19 @@ async function buildArticleWithStreams(title, ev, isHighlights = false) {
   } catch (e) { return base; }
 }
 
-async function buildArticleWithClaude(title, ev, isHighlights = false) {
+async function buildArticleWithAI(title, ev, isHighlights = false) {
   const cacheKey = (ev ? evKey(ev) : title) + (isHighlights ? '|hl' : '');
   if (dsArticleCache[cacheKey]) return dsArticleCache[cacheKey];
-  if (CFG.deepseekKey) {
-    try {
-      const prompt = buildClaudePrompt(title, ev, isHighlights);
-      const article = await callClaude(prompt);
-      dsArticleCache[cacheKey] = article;
-      return article;
-    } catch (e) { console.warn('[Claude] Article gen failed, using fallback:', e.message); }
-  }
-  return buildArticleFallback(title, ev);
+  const article = await callAI(buildAIPrompt(title, ev, isHighlights));
+  dsArticleCache[cacheKey] = article;
+  return article;
 }
+const buildArticleWithClaude = buildArticleWithAI;
 
 function buildArticleFallback(title, ev) {
-  const player = CFG.playerBase;
-  if (!ev) {
-    const p = parseTitle(title);
-    const h = p?.home || 'Home Team', a = p?.away || 'Away Team';
-    return pick(P_MO) + ' ' + h + ' and ' + a + '.\n\n' + pick(P_MC) + '\n\n📅 Date: TBD\n⚽ Match: ' + h + ' vs ' + a + '\n\n📺 Watch free on Sports 803 — no sign-up required.\n\n' + pick(P_CTA) + '\n\n#' + h.replace(/\s/g, '') + ' #' + a.replace(/\s/g, '') + ' #Sports803';
-  }
-  if (ev.type === 'race') {
-    const ts = ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : 'this weekend';
-    return pick(P_RO) + ' the ' + ev.name + '.\n\n' + pick(P_RC) + '\n\n🏎️ Event: ' + ev.name + '\n📍 Venue: ' + (ev.venue || 'TBC') + '\n🕐 Start: ' + ts + '\n\nStream FREE: ' + player + '\n\n' + pick(P_CTA);
-  }
-  const h = ev.home.name, a = ev.away.name, lg = ev.league.name;
-  const ts = ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : 'today';
-  return pick(P_MO) + ' ' + h + ' and ' + a + ' go head-to-head in ' + lg + '.\n\n' + pick(P_MC) + ' ' + pick(P_MC) + '\n\n📅 Date: ' + ts + '\n🏆 Competition: ' + lg + '\n⚽ Match: ' + h + ' vs ' + a + '\n\nStream FREE on Sports 803: ' + player + '\n\n' + pick(P_CTA) + '\n\n#' + h.replace(/\s/g, '') + ' #' + a.replace(/\s/g, '') + ' #' + lg.replace(/\s/g, '') + ' #Sports803';
+  const player = CFG.playerBase || 'https://sports803.github.io/player/';
+  return `<h2>${title}</h2>\n<p><em>Draft shell — the AI provider chain failed. Add the article body manually before publishing.</em></p>\n<h2>Match Overview</h2><p></p>\n<h2>How To Watch</h2><p>📺 Watch free on Sports 803: <a href="${player}">${player}</a></p>`;
 }
-
-// ----- Fallback text pools -----
-const P_MO = [
-  'Football fans worldwide are in for an unmissable treat as',
-  'The stage is set for a high-stakes encounter between',
-  'Excitement reaches fever pitch as two titans prepare to collide:',
-  'In a clash that promises fireworks, all eyes are on the showdown between',
-  'Get ready for a pulsating 90 minutes as'
-];
-const P_MC = [
-  'Both clubs arrive at this fixture in contrasting form.',
-  'The head-to-head history between these two sides makes for compelling reading.',
-  'Recent results suggest momentum could play a decisive role in this contest.',
-  'Tactical battles across the pitch will likely determine who comes out on top.'
-];
-const P_RO = ['The engines are revving and the motorsport world is focused on', 'Throttle-deep anticipation builds as the grid lights prepare to go out for'];
-const P_RC = ['The championship standings remain tight, making every point decisive.', 'Tyre degradation and fuel loads will be critical factors throughout the race.'];
-const P_CTA = ['Watch it all LIVE on Sports 803 — free, no sign-up required.', 'Stream the full action absolutely FREE on Sports 803 – no subscription needed.'];
 
 // ============================================================
 //  STREAM BUILDERS (add/remove)
@@ -5742,9 +5773,9 @@ function applyConfigToUI() {
   if (document.getElementById('cfg-embed-streams-in-post')) document.getElementById('cfg-embed-streams-in-post').checked = CFG.embedStreamsInPost !== false;
   set('cfg-deepseek-key', CFG.deepseekKey || '');
   set('cfg-deepseek-tone', CFG.deepseekTone || '');
-  if (document.getElementById('cfg-deepseek-model')) document.getElementById('cfg-deepseek-model').value = CFG.deepseekModel || 'claude-sonnet-4-20250514';
+  if (document.getElementById('cfg-deepseek-model')) document.getElementById('cfg-deepseek-model').value = CFG.deepseekModel || 'deepseek-ai/deepseek-v4-flash-0731';
   if (document.getElementById('cfg-deepseek-length')) document.getElementById('cfg-deepseek-length').value = CFG.deepseekLength || 'medium';
-  updateClaudeStatus();
+  updateAIStatusBadge();
 }
 
 // ============================================================
@@ -5777,7 +5808,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ctx.textBaseline = 'middle';
   ctx.fillText('SPORTS 803 · AUTO THUMBNAIL', cv.width / 2, cv.height / 2);
   document.getElementById('schedule-dt-wrap').style.display = 'block';
-  updateClaudeStatus();
+  updateAIStatusBadge();
   if (CFG.autoFetchStreams || CFG.enableOneTV || CFG.enablePPVTV) {
     ddkanquMappings = parseDDKMappings(CFG.ddkanquMappingsRaw);
     const loaders = [];
@@ -5791,7 +5822,7 @@ document.addEventListener('DOMContentLoaded', () => {
       saveAll();
     });
   }
-  console.log('[Sports 803] v9 loaded. Claude AI: ' + (CFG.deepseekKey ? '✓' : 'not configured') + '. Draft auto-save: active.');
+  console.log('[Sports 803] v9 loaded. AI providers: ' + (CFG.deepseekKey ? '✓' : 'not configured') + '. Draft auto-save: active.');
 });
 </script>
 </body>
