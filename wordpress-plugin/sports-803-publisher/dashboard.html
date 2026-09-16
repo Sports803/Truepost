@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sports 803 · Unified Dashboard v10</title>
+<title>Sports 803 · Blogger Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -243,25 +243,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
   background: var(--green);
   box-shadow: 0 0 6px var(--green);
 }
-.wp-auth-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-left: 8px;
-  border-left: 1px solid var(--border);
-}
-.wp-auth-label {
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: .68rem;
-  color: var(--muted);
-}
-.wp-auth-label.on { color: var(--green); }
-@media (max-width: 900px) {
-  .wp-auth-wrap { display: none; }
-}
+
 
 /* ===== MOBILE ===== */
 .mobile-menu-toggle {
@@ -1326,7 +1308,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
   <div class="logo">
     <div class="logo-live" aria-hidden="true"></div>
     Sports <span style="color:#fff">803</span>
-    <span class="logo-ver">v9 · Full Featured</span>
+    <span class="logo-ver">v9 · Blogger</span>
   </div>
   <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Open navigation menu" aria-expanded="false" onclick="toggleMobileMenu()">☰</button>
   <div class="topbar-center">
@@ -1347,12 +1329,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
     <span id="auth-dot" aria-hidden="true"></span>
     <span id="auth-label" style="font-size:.72rem;color:var(--muted)">Not signed in</span>
     <button class="btn-red btn-sm" id="auth-btn" onclick="handleAuth()">Sign in</button>
-    <div class="wp-auth-wrap">
-      <span id="wp-auth-dot" class="auth-dot" aria-hidden="true"></span>
-      <span id="wp-auth-label" class="wp-auth-label">WordPress</span>
-      <button class="btn-blue btn-sm" id="wp-auth-btn" onclick="handleWordPressAuth()">Connect</button>
-    </div>
-  </div>
+</div>
 </div>
 
 <!-- ===== MOBILE ===== -->
@@ -1381,14 +1358,6 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
       <span id="mobile-auth-label" class="mobile-auth-status">Not signed in</span>
     </div>
     <button class="btn-red btn-sm" id="mobile-auth-btn" onclick="handleAuth();closeMobileMenu()">Sign in</button>
-  </div>
-  <div class="mobile-auth">
-    <span id="mobile-wp-auth-dot" class="auth-dot" aria-hidden="true"></span>
-    <div class="mobile-auth-copy">
-      <span class="mobile-auth-label">WordPress</span>
-      <span id="mobile-wp-auth-label" class="mobile-auth-status">Not connected</span>
-    </div>
-    <button class="btn-blue btn-sm" id="mobile-wp-auth-btn" onclick="handleWordPressAuth();closeMobileMenu()">Connect</button>
   </div>
 </aside>
 
@@ -1924,17 +1893,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
       <div class="form-group"><label>Google OAuth Client ID</label><input type="text" id="cfg-clientid" placeholder="xxx.apps.googleusercontent.com"></div>
       <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn-red btn-sm" onclick="saveCFG()">💾 Save</button><button class="btn-ghost btn-sm" onclick="refreshBloggerBlogs()">🔄 Refresh Blogs</button></div>
     </div>
-    <div class="card">
-      <div class="card-title">WordPress Site Login</div>
-      <div class="form-group"><label>WordPress Site URL</label><input type="url" id="cfg-wp-url" placeholder="https://your-site.com"></div>
-      <div class="form-row">
-        <div><label>WordPress Username</label><input type="text" id="cfg-wp-username" autocomplete="username" placeholder="Your WP username"></div>
-        <div><label>Application Password</label><input type="password" id="cfg-wp-password" autocomplete="current-password" placeholder="xxxx xxxx xxxx xxxx"></div>
-      </div>
-      <div style="font-size:.68rem;color:var(--muted2);line-height:1.5;margin-bottom:10px">Use a WordPress <strong>Application Password</strong>, not your normal password. It is kept only in this browser tab and never saved to the repository or local storage.</div>
-      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center"><button class="btn-blue btn-sm" onclick="saveWordPressSettings()">💾 Save &amp; Test</button><button class="btn-ghost btn-sm" onclick="handleWordPressAuth()">Connect</button><span id="wp-settings-status" style="font-size:.68rem;color:var(--muted2)">Not connected</span></div>
-    </div>
-    <div class="card">
+<div class="card">
       <div class="form-group"><label>imgbb API Key</label><input type="text" id="cfg-imgbb" placeholder="Get free at api.imgbb.com"></div>
       <div class="form-group"><label>YouTube Data API Key</label><input type="text" id="cfg-yt-key" placeholder="AIzaSy…"></div>
       <div class="form-group"><label>Default Player URL</label><input type="text" id="cfg-player" placeholder="https://…player.html"></div>
@@ -2155,7 +2114,12 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
 <div id="toasts" role="status" aria-live="polite"></div>
 
 <script src="https://accounts.google.com/gsi/client" async>
-// CHANGELOG v10: added canonTeam, evKey, STATUS, migratePostLog, prunePostLog, validatePostIdUniqueness, extractReplayId, extractPostIdFromUrl, resolvePostUrlToId, stripInjectedBlocks, buildHighlightsPlayerIframe, searchOneBallHighlights, oneBallSearchAndFill, oneBallSearchForModal, postHighlights, unmarkHighlights, updateHLResolution, updateHLPostButton, syncPostLogFromBlogger, renderPostLog, renderPostLogDiagnostics, repairPostLog, fetchPostBody, postRaw, updateExistingPost, getLabels, renderMatchCard, renderRaceCard, genAndFill, quickPostEv, checkHighlights, fetchAllOneBallHighlights, runSchedTick.
+// CHANGELOG — Blogger-only cleanup
+// Removed: legacy secondary-platform authentication, settings, state, CSS, and DOM blocks
+// Removed: platform-specific URL, REST, credential, and connection helpers
+// Removed: legacy platform fields from CFG and migrated them out of localStorage
+// Added: migrateRemoveWordPress() in loadAll()
+// Blogger pipeline: untouched
 (function installV10() {
   const oldLoadAll = loadAll;
   function isEntry(k,v) { return k && v && typeof v === 'object' && !k.startsWith('__'); }
@@ -2233,7 +2197,7 @@ const EVENT_FIREBASE_CHANNELS_PATH = 'livetv/channels';
 
 // ----- STATE -----
 let CFG = {
-  blogId: '', clientId: EVENT_BUILTIN_CLIENT_ID, imgbbKey: '', playerBase: 'https://sports803.github.io/player/', wordpressUrl: '', wordpressUsername: '',
+  blogId: '', clientId: EVENT_BUILTIN_CLIENT_ID, imgbbKey: '', playerBase: 'https://sports803.github.io/player/', Url: '', Username: '',
   activeLeagues: ['ucl', 'epl', 'laliga', 'seriea', 'bundesliga', 'f1', 'nba', 'ufc'],
   schedTiming: 60, schedStatus: 'DRAFT', schedInterval: 300000,
   schedEnabled: false, schedThumbs: true, logoOverridesRaw: '',
@@ -2251,7 +2215,6 @@ let LOGO_OVERRIDES = {}, LOGO_CACHE = {};
 let allEvents = [], channels = [], postLog = {};
 let accessToken = null, editingCH = null;
 let bloggerUser = null, bloggerBlogs = [], bloggerTokenClient = null;
-let wordpressPassword = null, wordpressUser = null;
 let editingPostId = null, editingEventKey = null;
 let schedTimer = null, schedNextFire = null;
 let tbDebounce, composDebounce;
@@ -2295,7 +2258,19 @@ function saveAll() {
   }, 300);
 }
 
+function migrateRemoveWordPress() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SK_CFG) || '{}');
+    if (raw?.data && (raw.data.Url !== undefined || raw.data.Username !== undefined)) {
+      delete raw.data.Url;
+      delete raw.data.Username;
+      localStorage.setItem(SK_CFG, JSON.stringify(raw));
+    }
+  } catch (e) {}
+}
+
 function loadAll() {
+  migrateRemoveWordPress();
   try { const p = JSON.parse(localStorage.getItem(SK_CFG) || '{}'); if (p.data) CFG = { ...CFG, ...p.data }; } catch(e) {}
   try { const p = JSON.parse(localStorage.getItem(SK_CH) || '{}'); channels = p.data?.length ? p.data : DEFAULT_CHANNELS; } catch(e) { channels = [...DEFAULT_CHANNELS]; }
   try { const p = JSON.parse(localStorage.getItem(SK_POST) || '{}'); if (p.data) postLog = p.data; } catch(e) {}
@@ -2315,8 +2290,6 @@ function loadAll() {
 function saveCFG() {
   CFG.blogId = v('cfg-blogid');
   CFG.clientId = v('cfg-clientid') || EVENT_BUILTIN_CLIENT_ID;
-  CFG.wordpressUrl = normalizeWordPressUrl(v('cfg-wp-url'));
-  CFG.wordpressUsername = v('cfg-wp-username');
   CFG.imgbbKey = v('cfg-imgbb');
   CFG.ytApiKey = v('cfg-yt-key');
   CFG.playerBase = v('cfg-player') || 'https://sports803.github.io/player/';
@@ -2767,102 +2740,6 @@ function importTemplates() {
 //  BLOGGER AUTH
 // ============================================================
 // ----- GOOGLE OAUTH + MULTI-BLOG ACCOUNT -----
-function normalizeWordPressUrl(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  try {
-    const url = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
-    return url.origin;
-  } catch { return ''; }
-}
-
-function updateWordPressAuthUI(message = '') {
-  const connected = Boolean(wordpressPassword && wordpressUser);
-  const label = wordpressUser?.name || wordpressUser?.username || 'WordPress';
-  const desktopDot = document.getElementById('wp-auth-dot');
-  const desktopLabel = document.getElementById('wp-auth-label');
-  const desktopButton = document.getElementById('wp-auth-btn');
-  const mobileDot = document.getElementById('mobile-wp-auth-dot');
-  const mobileLabel = document.getElementById('mobile-wp-auth-label');
-  const mobileButton = document.getElementById('mobile-wp-auth-btn');
-  desktopDot?.classList.toggle('on', connected);
-  mobileDot?.classList.toggle('on', connected);
-  if (desktopLabel) { desktopLabel.textContent = connected ? label : 'WordPress'; desktopLabel.classList.toggle('on', connected); }
-  if (mobileLabel) mobileLabel.textContent = connected ? label : 'Not connected';
-  if (desktopButton) desktopButton.textContent = connected ? 'Disconnect' : 'Connect';
-  if (mobileButton) mobileButton.textContent = connected ? 'Disconnect' : 'Connect';
-  const status = document.getElementById('wp-settings-status');
-  if (status) { status.textContent = message || (connected ? 'Connected as ' + label : 'Not connected'); status.style.color = connected ? 'var(--green)' : 'var(--muted2)'; }
-}
-
-function wordpressAuthHeader() {
-  return 'Basic ' + btoa(`${CFG.wordpressUsername}:${wordpressPassword}`);
-}
-
-async function fetchWordPressCurrentUser(siteUrl) {
-  const routes = [
-    `${siteUrl}/wp-json/wp/v2/users/me?context=edit`,
-    `${siteUrl}/index.php?rest_route=/wp/v2/users/me&context=edit`
-  ];
-  let lastResponse = null;
-  for (const url of routes) {
-    const response = await fetch(url, { headers: { Authorization: wordpressAuthHeader(), Accept: 'application/json' } });
-    const contentType = response.headers.get('content-type') || '';
-    lastResponse = response;
-    if (contentType.includes('application/json')) return response;
-  }
-  return lastResponse;
-}
-
-async function connectWordPress() {
-  const siteUrl = normalizeWordPressUrl(v('cfg-wp-url') || CFG.wordpressUrl);
-  const username = v('cfg-wp-username') || CFG.wordpressUsername;
-  const password = v('cfg-wp-password') || wordpressPassword;
-  if (!siteUrl || !username || !password) { toast('Enter the WordPress site, username, and Application Password', 'w'); return false; }
-  CFG.wordpressUrl = siteUrl;
-  CFG.wordpressUsername = username;
-  wordpressPassword = password;
-  try {
-    const response = await fetchWordPressCurrentUser(siteUrl);
-    if (!response) throw new Error('No response from WordPress REST API');
-    if (!response.ok) throw new Error(response.status === 401 ? 'Invalid username or Application Password' : `WordPress HTTP ${response.status}`);
-    wordpressUser = await response.json();
-    set('cfg-wp-url', siteUrl);
-    set('cfg-wp-username', username);
-    set('cfg-wp-password', '');
-    saveAll();
-    updateWordPressAuthUI('Connected as ' + (wordpressUser.name || wordpressUser.username));
-    toast('Connected to WordPress ✓', 's');
-    return true;
-  } catch (error) {
-    wordpressPassword = null;
-    wordpressUser = null;
-    updateWordPressAuthUI('Connection failed: ' + error.message);
-    toast('WordPress login failed: ' + error.message, 'e');
-    return false;
-  }
-}
-
-function saveWordPressSettings() {
-  const siteUrl = normalizeWordPressUrl(v('cfg-wp-url'));
-  if (!siteUrl) { toast('Enter a valid WordPress site URL', 'w'); return; }
-  CFG.wordpressUrl = siteUrl;
-  CFG.wordpressUsername = v('cfg-wp-username');
-  saveAll();
-  connectWordPress();
-}
-
-function handleWordPressAuth() {
-  if (wordpressPassword && wordpressUser) {
-    wordpressPassword = null;
-    wordpressUser = null;
-    updateWordPressAuthUI('Disconnected');
-    toast('Disconnected from WordPress', 'i');
-    return;
-  }
-  connectWordPress();
-}
-
 function updateAuthUI(isSignedIn) {
   const signed = Boolean(isSignedIn && accessToken);
   const dot = document.getElementById('auth-dot');
@@ -5688,9 +5565,6 @@ function applyConfigToUI() {
   set('cfg-blogid', CFG.blogId);
   renderBloggerBlogs();
   set('cfg-clientid', CFG.clientId);
-  set('cfg-wp-url', CFG.wordpressUrl || '');
-  set('cfg-wp-username', CFG.wordpressUsername || '');
-  updateWordPressAuthUI();
   set('cfg-imgbb', CFG.imgbbKey);
   set('cfg-yt-key', CFG.ytApiKey || '');
   set('cfg-player', CFG.playerBase);
