@@ -14,6 +14,10 @@ The reference player route is `https://sports803.github.io/player/`. OneTV-compa
 
 The workflow uses Node.js 22 and the same `npm run auto-publish` entry-point convention as the reference repository. `FIREBASE_PUBLIC_WRITE` is explicitly disabled; authenticated Firebase access is required for automation runs.
 
+### Editorial quality safeguards
+
+Automated posts are published as match guides rather than stream-only landing pages. Each guide includes verified fixture details, a clearly dated source note, practical viewing instructions, a distinction between official broadcasters and third-party player availability, FAQs, and an editorial note explaining what is known and what is intentionally not claimed. The generator does not invent form, injuries, lineups, statistics, or results. It skips incomplete events that do not have team names, a competition, a scheduled date, and a player URL. This is designed to reduce thin or misleading pages, but it is not a guarantee of AdSense approval: the site still needs genuine ongoing editorial work, clear ownership, useful navigation, and complete privacy/contact/about information.
+
 ## Required GitHub Actions secrets
 
 | Secret | Purpose |

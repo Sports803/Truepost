@@ -232,18 +232,73 @@ async function uploadThumbnail(cvDataUrl) {
   }
 }
 
+function formatKickoff(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Time to be confirmed';
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'full',
+    timeStyle: 'short',
+    timeZone: 'UTC'
+  }).format(date) + ' UTC';
+}
+
+function buildEditorialContent(item) {
+  const home = escapeHtml(item.homeName);
+  const away = escapeHtml(item.awayName);
+  const league = escapeHtml(item.league || 'the listed competition');
+  const kickoff = escapeHtml(formatKickoff(item.date));
+  const sourceUrl = escapeHtml(item.sourceUrl || SOURCE_URL);
+  const replay = item.replayPlayerUrl ? `
+<h2>Replay and highlights</h2>
+<p>If a replay is available, it is shown below. Replay availability can change after the event and is separate from the live coverage.</p>
+<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;background:#000;margin:16px 0;"><iframe src="${escapeHtml(item.replayPlayerUrl)}" title="${home} vs ${away} replay" allow="encrypted-media; fullscreen" allowfullscreen sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" loading="lazy"></iframe></div>` : '';
+
+  return `<article>
+<header>
+<p><small>Sports 803 match guide · Last checked ${escapeHtml(new Date().toISOString())}</small></p>
+<h1>${home} vs ${away}: schedule, viewing guide and match information</h1>
+<p>This page is a practical viewing guide for <strong>${home}</strong> vs <strong>${away}</strong> in ${league}. It brings together the fixture details we could verify, explains how to use the player, and will be updated when reliable match information becomes available.</p>
+</header>
+
+<h2>Fixture details</h2>
+<table style="width:100%;max-width:680px;border-collapse:collapse"><tbody>
+<tr><th scope="row" style="text-align:left;padding:8px;border-bottom:1px solid #ddd">Teams</th><td style="padding:8px;border-bottom:1px solid #ddd">${home} vs ${away}</td></tr>
+<tr><th scope="row" style="text-align:left;padding:8px;border-bottom:1px solid #ddd">Competition</th><td style="padding:8px;border-bottom:1px solid #ddd">${league}</td></tr>
+<tr><th scope="row" style="text-align:left;padding:8px;border-bottom:1px solid #ddd">Scheduled start</th><td style="padding:8px;border-bottom:1px solid #ddd">${kickoff}</td></tr>
+<tr><th scope="row" style="text-align:left;padding:8px">Information source</th><td style="padding:8px"><a href="${sourceUrl}" rel="nofollow noopener">OneTV event listing</a></td></tr>
+</tbody></table>
+
+<h2>What to look for</h2>
+<p>The most useful way to follow this fixture is to compare the confirmed lineups, the opening approach, and the changes made after the first major momentum swing. We do not invent injury news, form figures, standings, or player statistics here: those details should be added only after they are verified from a reputable competition, club, or data-provider source.</p>
+<ul><li><strong>Before kickoff:</strong> check the final team news and the official broadcaster in your country.</li><li><strong>During the event:</strong> note the score, substitutions, cards, and other decisive incidents as they are confirmed.</li><li><strong>After full time:</strong> compare the result with the pre-match expectations and review the verified match report.</li></ul>
+
+<h2>How to use the live player</h2>
+<p>Choose a player below and allow it a few seconds to load. If the first source is unavailable, return to this page and try the alternative offered by the player. Availability and geographic access can change, so official broadcast listings remain the best option where available.</p>
+<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;background:#000;margin:16px 0;"><iframe src="${escapeHtml(item.playerUrl)}" title="${home} vs ${away} live player" allow="encrypted-media; fullscreen" allowfullscreen sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" loading="lazy"></iframe></div>
+<p><small>Sports 803 provides the page and player interface. It does not guarantee that a third-party stream will remain available, and users should use content only where they have the right to access it.</small></p>
+${replay}
+
+<h2>Frequently asked questions</h2>
+<h3>When is ${home} vs ${away} scheduled?</h3><p>The listing currently shows ${kickoff}. Always confirm the time against an official competition or broadcaster listing because schedules can change.</p>
+<h3>Where can I watch it?</h3><p>Use the official broadcaster in your region where possible. The embedded player above is an additional viewing interface whose availability may vary by location and server status.</p>
+<h3>Will this page publish a result?</h3><p>When a verified result or replay is available, this page can be updated with the score and key events. Until then, it intentionally avoids guessing the outcome or presenting unverified claims as facts.</p>
+
+<footer><p><strong>Editorial note:</strong> This guide was assembled from the event listing and is maintained as a utility page for supporters. Corrections and verified updates should be made before adding analysis or statistics.</p></footer>
+</article>`;
+}
+
+function hasMinimumPostQuality(item) {
+  return Boolean(item?.homeName && item?.awayName && item?.league && item?.date && item?.playerUrl);
+}
+
 async function postToBlogger(item, accessToken) {
   if (!BLOGGER_BLOG_ID) throw new Error('Missing BLOGGER_BLOG_ID');
-  
-  let content = `<h2>${escapeHtml(item.homeName)} vs ${escapeHtml(item.awayName)} — Live Stream</h2>\n<p><strong>Competition:</strong> ${escapeHtml(item.league)}<br><strong>Watch it live below.</strong></p>\n<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;background:#000;margin:16px 0;"><iframe src="${escapeHtml(item.playerUrl)}" allow="encrypted-media; fullscreen" allowfullscreen sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" loading="lazy"></iframe></div>\n<p>Live stream provided through Sports 803. If one server is slow, use the player alternatives.</p>`;
-  
-  if (item.replayPlayerUrl) {
-    content += `\n<h2>Match Highlights / Replay</h2>\n<p>Missed the action? Watch the full match highlights and replay here.</p>\n<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;background:#000;margin:16px 0;"><iframe src="${escapeHtml(item.replayPlayerUrl)}" allow="encrypted-media; fullscreen" allowfullscreen sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" loading="lazy"></iframe></div>`;
-  }
+  if (!hasMinimumPostQuality(item)) throw new Error('Skipping incomplete event: missing verified fixture or player data');
+  const content = buildEditorialContent(item);
 
   const response = await fetch(`${BLOGGER_API}/blogs/${encodeURIComponent(BLOGGER_BLOG_ID)}/posts`, {
     method: 'POST', headers: { 'authorization': `Bearer ${accessToken}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ title: `${item.homeName} vs ${item.awayName} – ${item.league} Live Stream`, content, labels: ['sports', 'live', 'onetv', item.league].filter(Boolean), status: 'LIVE' })
+    body: JSON.stringify({ title: `${item.homeName} vs ${item.awayName} – ${item.league} match guide`, content, labels: ['sports', 'match guide', 'onetv', item.league].filter(Boolean), status: 'LIVE' })
   });
   const body = await response.text();
   if (!response.ok) throw new Error(`Blogger ${response.status}: ${body.slice(0, 300)}`);
@@ -336,6 +391,7 @@ async function main() {
         ...item, 
         embedUrls, 
         playerUrl: buildPlayerUrl(item.streamUrl, embedUrls),
+        sourceUrl: SOURCE_URL,
         replayStreamUrl,
         replayPlayerUrl
       };
@@ -360,4 +416,4 @@ if (process.argv[1] && new URL(`file://${process.argv[1]}`).href === import.meta
   main().catch(error => { console.error(error); process.exitCode = 1; });
 }
 
-export { parseOneTV, buildPlayerUrl, pairKey, loadPPVTVMatches };
+export { parseOneTV, buildPlayerUrl, pairKey, loadPPVTVMatches, buildEditorialContent, hasMinimumPostQuality };
