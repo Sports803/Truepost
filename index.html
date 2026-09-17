@@ -3729,7 +3729,7 @@ function renderEventCards(events) {
 
 function renderMatchCard(ev) {
   const ts = ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD';
-  const sc = STATUS.badgeClass(ev.status);
+  const sc = window.STATUS.badgeClass(ev.status);
   const pl = getLog(ev);
   const sid = encodeURIComponent(String(ev.id));
   const badge = pl ? '<span class="post-badge ' + (pl.status || 'draft').toLowerCase() + '">' + (pl.status || 'draft') + '</span>' : '';
@@ -3749,7 +3749,7 @@ function renderMatchCard(ev) {
 
 function renderRaceCard(ev) {
   const ts = ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD';
-  const sc = STATUS.badgeClass(ev.status);
+  const sc = window.STATUS.badgeClass(ev.status);
   const pl = getLog(ev);
   const sid = encodeURIComponent(String(ev.id));
   const badge = pl ? '<span class="post-badge ' + (pl.status || 'draft').toLowerCase() + '">' + (pl.status || 'draft') + '</span>' : '';
@@ -3779,7 +3779,7 @@ async function genAndFill(sid) {
   const ev = findEv(sid);
   if (!ev) { toast('Event not found', 'e'); return; }
   setSEOEvent(ev);
-  const fin = ev.type === 'match' && STATUS.isFinal(ev.status) && ev.home.score !== '' && ev.away.score !== '';
+  const fin = ev.type === 'match' && window.STATUS.isFinal(ev.status) && ev.home.score !== '' && ev.away.score !== '';
   const score = fin && ev.home.score !== '' ? ev.home.score + '–' + ev.away.score : '';
   let title;
   if (fin && ev.type === 'match') {
@@ -3850,7 +3850,7 @@ async function genAndFill(sid) {
 
 async function quickPostEv(sid) {
   const gateEv = findEv(sid);
-  if (gateEv && STATUS.isDead(gateEv.status)) { toast('This event was postponed/cancelled — nothing to post.', 'w'); return; }
+  if (gateEv && window.STATUS.isDead(gateEv.status)) { toast('This event was postponed/cancelled — nothing to post.', 'w'); return; }
   if (!accessToken) { toast('Sign in first', 'e'); return; }
   const ev = findEv(sid);
   if (!ev) return;
@@ -3940,7 +3940,7 @@ async function bulkPostAll() {
 }
 async function bulkPostHighlights() {
   if (!accessToken) { toast('Sign in first', 'e'); return; }
-  const finished = allEvents.filter(ev => ev.type === 'match' && STATUS.isFinished(ev.status));
+  const finished = allEvents.filter(ev => ev.type === 'match' && window.STATUS.isFinished(ev.status));
   if (!finished.length) { toast('No finished matches found. Set the date picker to the correct day and click Fetch All first.', 'i'); return; }
   const fresh = finished.filter(ev => !getLog(ev)?.hasHL);
   const existing = finished.filter(ev => getLog(ev)?.hasHL && getLog(ev)?.postId);
@@ -4563,7 +4563,7 @@ async function searchOneBallHighlights(ev) {
 }
 async function oneBallSearchAndFill(sid){const ev=sid?findEv(sid):currentComposeEv;if(!ev){toast('No event selected','w');return}const r=await searchOneBallHighlights(ev);if(!r)return;set('highlights-video-url',r.playerUrl);updateHighlightsPlayer();const b=document.getElementById('post-body');b.value=stripInjectedBlocks(b.value);b.value+=(b.value?'\n\n':'')+buildHighlightsPlayerIframe(r.playerUrl);set('hl-video',r.playerUrl);updateSEO();toast('✓ OneBall Replay found and saved','s');}
 async function oneBallSearchForModal(){const ev=allEvents[parseInt(v('hl-select'))];if(!ev){toast('Select an event first','w');return}const r=await searchOneBallHighlights(ev);if(r){set('hl-video',r.playerUrl);onHLSelect();toast('✓ OneBall Replay found: '+r.title,'s')}}
-async function fetchAllOneBallHighlights(){const fin=allEvents.filter(ev=>STATUS.isFinal(ev.status));if(!fin.length){toast('No finished events found to fetch highlights for.','w');return}toast('Starting OneBall search for '+fin.length+' events…','i');let found=0;for(const ev of fin){if(await searchOneBallHighlights(ev))found++;await new Promise(r=>setTimeout(r,500))}renderEventCards(allEvents);toast('OneBall search complete. Found '+found+' replay(s).','s')}
+async function fetchAllOneBallHighlights(){const fin=allEvents.filter(ev=>window.STATUS.isFinal(ev.status));if(!fin.length){toast('No finished events found to fetch highlights for.','w');return}toast('Starting OneBall search for '+fin.length+' events…','i');let found=0;for(const ev of fin){if(await searchOneBallHighlights(ev))found++;await new Promise(r=>setTimeout(r,500))}renderEventCards(allEvents);toast('OneBall search complete. Found '+found+' replay(s).','s')}
 
 // ============================================================
 //  FULL RACES SCRAPER
@@ -4885,7 +4885,7 @@ function openHLForEv(sid) {
 }
 
 function checkHighlights() {
-  const fin = allEvents.filter(ev => STATUS.isFinal(ev.status));
+  const fin = allEvents.filter(ev => window.STATUS.isFinal(ev.status));
   if (!fin.length) { toast('No finished events found. Fetch today\'s events first.', 'w'); return; }
   populateHLSelect();
   const pending = fin.find(ev => !getLog(ev)?.hasHL);
@@ -5162,7 +5162,7 @@ async function runSchedTick() {
   const now = Date.now(), offset = (CFG.schedTiming || 60) * 60000;
   let posted = 0;
   for (const ev of allEvents) {
-    if (!ev.startTime || STATUS.isDead(ev.status)) continue;
+    if (!ev.startTime || window.STATUS.isDead(ev.status)) continue;
     const pl = getLog(ev);
     const diff = ev.startTime.getTime() - now;
     if (!pl?.postId && diff > 0 && diff <= offset && Date.now() - (pl?.lastAttemptTs || 0) > 10 * 60000) {
@@ -5658,7 +5658,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.stripInjectedBlocks=function(html){return String(html||'').replace(/<div id="s803-highlights-player"[\s\S]*?<\/div>\s*(?=<|$)/gi,'').replace(/<div id="s803-hl-thumb"[\s\S]*?<\/div>\s*(?=<|$)/gi,'');};
   window.buildHighlightsPlayerIframe=function(url){if(!url)return '';const canonical=canonicalOneBallReplayUrl(String(url).split('?')[0]),base=playerBaseUrl();let src=String(url);if(!src.includes('?mora=')&&!src.includes('&mora=')&&!src.includes('?one=')&&!src.includes('&one='))src=base+'?one='+canonical;return '<div id="s803-highlights-player" data-canonical="'+canonical.replace(/"/g,'&quot;')+'" style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px"><iframe loading="lazy" src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:10px" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>';};
   window.getLabels=function(ev){const base={ucl:['UEFA Champions League','UCL','Football Live Stream','Sports 803'],epl:['Premier League','EPL','Football Live Stream','Sports 803'],laliga:['La Liga','Spanish Football','Football Live Stream','Sports 803'],seriea:['Serie A','Italian Football','Sports 803'],bundesliga:['Bundesliga','German Football','Sports 803'],f1:['Formula 1','F1','Grand Prix','Sports 803'],nba:['NBA','Basketball','Sports 803'],nfl:['NFL','American Football','Sports 803'],ufc:['UFC','MMA','Sports 803']}[ev.league?.id]||['Sports 803'];return [...new Set([...base,'s803:'+evKey(ev),...(ev.home?.name?[ev.home.name]:[]),...(ev.away?.name?[ev.away.name]:[])])];};
-  window.STATUS={isFinished:s=>/\b(final|ft|full[\s-]?time|ended|finished|completed|aet|after[\s-]+extra[\s-]+time|after[\s-]+penalties|post[\s-]?match|pens)\b/i.test(s||''),isFinal:s=>/\b(final|ft|full[\s-]?time|ended|finished|completed|aet|after[\s-]+extra[\s-]+time|after[\s-]+penalties|post[\s-]?match|pens)\b/i.test(s||''),isLive:s=>/\b(in[\s-]?progress|live|halftime|half[\s-]?time|1st half|2nd half|end of regulation|overtime|ot)\b/i.test(s||''),isDead:s=>/\b(postponed|cancel(l)?ed|suspended|abandoned|delayed)\b/i.test(s||''),isSched:s=>!STATUS.isFinal(s)&&!STATUS.isLive(s)&&!STATUS.isDead(s),badgeClass:s=>STATUS.isLive(s)?'live':STATUS.isFinal(s)?'final':STATUS.isDead(s)?'dead':'sched',label:s=>s||'Scheduled'};
+  window.STATUS={isFinished:s=>/\b(final|ft|full[\s-]?time|ended|finished|completed|aet|after[\s-]+extra[\s-]+time|after[\s-]+penalties|post[\s-]?match|pens)\b/i.test(s||''),isFinal:s=>/\b(final|ft|full[\s-]?time|ended|finished|completed|aet|after[\s-]+extra[\s-]+time|after[\s-]+penalties|post[\s-]?match|pens)\b/i.test(s||''),isLive:s=>/\b(in[\s-]?progress|live|halftime|half[\s-]?time|1st half|2nd half|end of regulation|overtime|ot)\b/i.test(s||''),isDead:s=>/\b(postponed|cancel(l)?ed|suspended|abandoned|delayed)\b/i.test(s||''),isSched:s=>!window.STATUS.isFinal(s)&&!window.STATUS.isLive(s)&&!window.STATUS.isDead(s),badgeClass:s=>window.STATUS.isLive(s)?'live':window.STATUS.isFinal(s)?'final':window.STATUS.isDead(s)?'dead':'sched',label:s=>s||'Scheduled'};
   window.fetchPostBody=async function(postId){if(!accessToken||!CFG.blogId)return null;const id=extractPostIdFromUrl(postId)||await resolvePostUrlToId(postId);if(!id)return null;try{const r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+id,{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();return {id:d.id,title:d.title||'',content:d.content||'',labels:d.labels||[],url:d.url||''};}catch(e){console.warn('[fetchPostBody]',e.message);return null;}};
   window.postRaw=async function(title,html,status,labels,publishDate=null){if(!CFG.blogId||!accessToken)return null;let url='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+(status==='LIVE'?'':'?isDraft=true');let r,last; for(let attempt=0;attempt<4;attempt++){try{r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({kind:'blogger#post',blog:{id:CFG.blogId},title,content:html,labels:labels||['Sports 803'],searchDescription:ensureSearchDescription(title,html,currentSEOEvent,true).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})})}); if(r.ok)return r.json(); last=r.status; if(![429,500,502,503,504].includes(r.status))break; await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}} toast('Post failed after retries: Blogger '+last,'e'); return null;};
   window.updateExistingPost=async function(ev,title,html,status,labels,publishDate=null){const pl=ev?getLog(ev):null,id=editingPostId||pl?.postId;if(!id){toast('No post ID to update','e');return null}const body={kind:'blogger#post',id,blog:{id:CFG.blogId},title,content:html,labels:labels||[],searchDescription:ensureSearchDescription(title,html,currentSEOEvent,true).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})};let r,last;for(let attempt=0;attempt<4;attempt++){try{r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+id,{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.ok){const p=await r.json();if(ev)setLog(ev,{postId:p.id,postUrl:p.url,status,title,league:ev.league?.name});toast('Post updated ✓','s');return p}last=r.status;if(![429,500,502,503,504].includes(r.status))break;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}}toast('Update failed after retries: Blogger '+last,'e');return null;};
@@ -5672,7 +5672,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.updateHLPostButton=function(){const b=document.getElementById('hl-post-button'),raw=v('hl-manual-post-url'),out=document.getElementById('hl-resolution'),c=document.getElementById('hl-override-confirm');if(b)b.disabled=!!raw&&(!out||out.textContent.startsWith('Could not')||(document.getElementById('hl-override-warning')?.style.display!=='none'&&!c?.checked));};
 window.buildRichHighlightSections=function(ev){const h=ev.home?.name||'Home',a=ev.away?.name||'Away',lg=typeof ev.league==='string'?ev.league:(ev.league?.name||'the competition'),dt=ev.startTime?new Date(ev.startTime).toLocaleString():'the scheduled time';return '<h2>Match Overview</h2><p>'+h+' vs '+a+' was a competitive '+lg+' fixture. This highlights article brings together the match context, the important passages of play, and the replay so readers can understand how the contest developed from kickoff to the final whistle.</p><h2>Match Details</h2><p><strong>Competition:</strong> '+lg+'<br><strong>Fixture:</strong> '+h+' vs '+a+'<br><strong>Scheduled:</strong> '+dt+'</p><h2>Key Moments</h2><p>The decisive moments came from changes in pressure, chances created in the final third, defensive recoveries, and the sequences that changed the scoreline. Watch the replay to see each phase in context rather than relying on a short score-only summary.</p><h2>Standout Contributions</h2><p>Players who carried the ball forward, created openings, defended dangerous situations, or delivered important set pieces shaped the story of this match. The full highlights player below provides the clearest way to review those contributions.</p><h2>What the Result Means</h2><p>This result will influence confidence and preparation for the next round of fixtures. Both teams can use the performance as a reference: one side will want to build on its best spells, while the other will focus on improving the moments that allowed the match to turn.</p><h2>How to Watch</h2><p>Use the embedded Sports 803 player below to watch the replay and revisit the main action. The article is designed to provide useful match context alongside the video rather than offering only a thin player link.</p>';};
   window.postHighlights=async function(){const ev=allEvents[parseInt(v('hl-select'))];if(!ev)return;const body=v('hl-body'),manual=v('hl-manual-post-url');if(!body){toast('Write/generate text first','i');return}if(manual){const id=await resolvePostUrlToId(manual);if(!id){toast('Could not resolve this URL — check the post still exists.','e');return}const pl=getLog(ev);if(pl?.postId&&String(pl.postId)!==String(id)&&!document.getElementById('hl-override-confirm')?.checked){toast('Confirm the manual override first','w');return}setLog(ev,{postId:id,postUrl:manual});}const pl=getLog(ev),video=v('hl-video'),canonical=canonicalOneBallReplayUrl(video.split('?')[0]),thumb=v('hl-thumb-url'); ensureSearchDescription((ev.home?.name||ev.name)+' vs '+(ev.away?.name||'')+' Highlights & Replay | Sports 803',body);let enrichedBody=body;if(!/Match Overview|Match Details/i.test(enrichedBody)||enrichedBody.trim().split(/\s+/).length<350)enrichedBody=enrichedBody+'\n\n'+buildRichHighlightSections(ev);let html='';if(thumb)html+='<div id="s803-hl-thumb" data-canonical="'+canonical+'"><img src="'+thumb+'" style="max-width:100%;height:auto;border-radius:10px;margin-bottom:18px"></div>\n';html+=stripInjectedBlocks(enrichedBody).replace(/<div id="s803-hl-thumb"[\s\S]*?<\/div>/gi,'');if(video)html+='\n\n'+buildHighlightsPlayerIframe(video);const title=(ev.home?.name||ev.name)+' vs '+(ev.away?.name||'')+' – Highlights & Replay | Sports 803',status=v('hl-post-status')||'LIVE',p=pl?.postId?await updateExistingPost(ev,title,html,status,getLabels(ev)):await postRaw(title,html,status,getLabels(ev));if(p){setLog(ev,{postId:p.id,postUrl:p.url,title,hasHL:true,status,thumb:thumb||pl?.thumb||null});toast(status==='LIVE'?'Highlights published ✓':'Highlights saved as draft ✓','s');closeModal('modal-hl');renderEventCards(allEvents);}};
-  window.checkHighlights=function(){const fin=allEvents.filter(e=>STATUS.isFinal(e.status));if(!fin.length){toast('No finished events found. Fetch today\'s events first.','w');return}populateHLSelect();const e=fin.find(x=>!getLog(x)?.hasHL)||fin[0];document.getElementById('hl-select').value=allEvents.indexOf(e);onHLSelect();openModal('modal-hl');};
+  window.checkHighlights=function(){const fin=allEvents.filter(e=>window.STATUS.isFinal(e.status));if(!fin.length){toast('No finished events found. Fetch today\'s events first.','w');return}populateHLSelect();const e=fin.find(x=>!getLog(x)?.hasHL)||fin[0];document.getElementById('hl-select').value=allEvents.indexOf(e);onHLSelect();openModal('modal-hl');};
   // Storage migration runs after the original loader has restored config and caches.
   oldLoadAll();
   const raw=localStorage.getItem(SK_POST);try{const j=JSON.parse(raw||'{}');postLog=migratePostLog(j.data||j);if(!j.schema||j.schema!==2)saveV10();}catch(e){postLog={};}prunePostLog();
@@ -5697,7 +5697,7 @@ window.buildRichHighlightSections=function(ev){const h=ev.home?.name||'Home',a=e
   const bulkHLOriginal=window.bulkPostHighlights;
   window.bulkPostHighlights=async function(){
     if(!accessToken){toast('Sign in first','e');return;}
-    const finished=allEvents.filter(ev=>ev.type==='match'&&STATUS.isFinished(ev.status));
+    const finished=allEvents.filter(ev=>ev.type==='match'&&window.STATUS.isFinished(ev.status));
     if(!finished.length){toast('No finished matches found. Set the date picker to the correct day and click Fetch All first.','i');return;}
     for(const ev of finished){const pl=getLog(ev);if(pl?.postId&&!pl.hlUrl){const post=await fetchPostBody(pl.postId);const url=highlightUrlFromBody(post?.content);if(url)setLog(ev,{hasHL:true,hlUrl:url,replayUrl:url});}}
     return bulkHLOriginal();
