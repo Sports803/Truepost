@@ -519,11 +519,11 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
   border: 1px solid rgba(6,214,160,.2);
 }
 .ec-status.sched {
-.ec-status.dead { background: rgba(122,142,168,.22); color: var(--muted2); text-decoration: line-through; }
   background: rgba(76,201,240,.08);
   color: var(--blue);
   border: 1px solid rgba(76,201,240,.18);
 }
+.ec-status.dead { background: rgba(122,142,168,.22); color: var(--muted2); text-decoration: line-through; }
 .ec-match {
   display: flex;
   align-items: center;
@@ -1950,7 +1950,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
         <div>
           <label>Claude Model</label>
           <select id="cfg-deepseek-model" onchange="saveCFG()">
-            <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (best quality)</option>
+            <option value="claude-sonnet-5">Claude Sonnet 5 (best quality)</option>
             <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fast &amp; cheap)</option>
           </select>
         </div>
@@ -2038,11 +2038,16 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
     <div class="card">
       <div class="card-title">Data Management</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-<div id="post-log-diagnostics" class="card" style="margin-top:12px"><div class="card-title">Post Log Diagnostics</div><div id="post-log-diagnostics-body" style="font-size:.75rem;color:var(--muted2)">Loading…</div><button class="btn-ghost btn-sm" onclick="repairPostLog()" style="margin-top:8px">Repair log</button></div>
-        <button class="btn-blue btn-sm" onclick="syncPostLogFromBlogger()">↻ Sync from Blogger</button> <button class="btn-ghost btn-sm" onclick="exportCFG()">📤 Export Config</button>
+        <button class="btn-blue btn-sm" onclick="syncPostLogFromBlogger()">↻ Sync from Blogger</button>
+        <button class="btn-ghost btn-sm" onclick="exportCFG()">📤 Export Config</button>
         <button class="btn-ghost btn-sm" onclick="importCFG()">📥 Import Config</button>
         <button class="btn-sm" style="background:#3d0c0c;color:#fff" onclick="clearAll()">🗑 Clear All</button>
       </div>
+    </div>
+    <div id="post-log-diagnostics" class="card" style="margin-top:12px">
+      <div class="card-title">Post Log Diagnostics</div>
+      <div id="post-log-diagnostics-body" style="font-size:.75rem;color:var(--muted2)">Loading…</div>
+      <button class="btn-ghost btn-sm" onclick="repairPostLog()" style="margin-top:8px">Repair log</button>
     </div>
   </div>
 </div>
@@ -2195,7 +2200,7 @@ let CFG = {
   firebaseChannelsPath: EVENT_FIREBASE_CHANNELS_PATH,
   autoFetchStreams: false, enableDdkanqu: false, enableOneTV: false, enablePPVTV: true, embedStreamsInPost: true,
   ddkanquMappingsRaw: '',
-  deepseekKey: '', deepseekModel: 'claude-sonnet-4-20250514', deepseekTone: '', deepseekLength: 'medium',
+  deepseekKey: '', deepseekModel: 'claude-sonnet-5', deepseekTone: '', deepseekLength: 'medium',
   ytApiKey: ''
 };
 let LOGO_OVERRIDES = {}, LOGO_CACHE = {};
@@ -2272,6 +2277,7 @@ function loadAll() {
   LOGO_OVERRIDES = parseLOOverrides(CFG.logoOverridesRaw);
   ddkanquMappings = parseDDKMappings(CFG.ddkanquMappingsRaw);
   if (!CFG.clientId || CFG.clientId === LEGACY_EVENT_CLIENT_ID) CFG.clientId = EVENT_BUILTIN_CLIENT_ID;
+  if (CFG.deepseekModel === 'claude-sonnet-4-20250514') CFG.deepseekModel = 'claude-sonnet-5';
   CFG.firebaseDatabaseUrl = CFG.firebaseDatabaseUrl || EVENT_FIREBASE_DATABASE_URL;
   CFG.firebaseEventsPath = CFG.firebaseEventsPath || EVENT_FIREBASE_EVENTS_PATH;
   CFG.firebaseChannelsPath = CFG.firebaseChannelsPath || EVENT_FIREBASE_CHANNELS_PATH;
@@ -2304,7 +2310,7 @@ function saveCFG() {
   CFG.embedStreamsInPost = document.getElementById('cfg-embed-streams-in-post')?.checked ?? true;
   CFG.ddkanquMappingsRaw = v('cfg-ddkanqu-mappings');
   CFG.deepseekKey = v('cfg-deepseek-key');
-  CFG.deepseekModel = document.getElementById('cfg-deepseek-model')?.value || 'claude-sonnet-4-20250514';
+  CFG.deepseekModel = document.getElementById('cfg-deepseek-model')?.value || 'claude-sonnet-5';
   CFG.deepseekTone = v('cfg-deepseek-tone');
   CFG.deepseekLength = document.getElementById('cfg-deepseek-length')?.value || 'medium';
   ddkanquMappings = parseDDKMappings(CFG.ddkanquMappingsRaw);
@@ -2591,7 +2597,7 @@ async function testClaude() {
     const r = await fetch(CLAUDE_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-4-20250514', max_tokens: 30, messages: [{ role: 'user', content: 'Reply only: "Sports 803 Claude OK"' }] })
+      body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-5', max_tokens: 30, messages: [{ role: 'user', content: 'Reply only: "Sports 803 Claude OK"' }] })
     });
     const d = await r.json();
     if (d.content?.[0]) { if (res) res.textContent = '✓ Connected: ' + d.content[0].text; toast('Claude AI connected ✓', 's'); }
@@ -2626,7 +2632,7 @@ async function callClaude(prompt) {
   const r = await fetch(CLAUDE_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-4-20250514', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-5', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
   });
   if (!r.ok) { const e = await r.text(); throw new Error('Claude API error ' + r.status + ': ' + e); }
   const d = await r.json();
@@ -2727,11 +2733,11 @@ function loadHighlightTemplate(name) {
   const ev = allEvents[parseInt(v('hl-select'))];
   if (name.startsWith('builtin:')) {
     const html = ev && BUILTIN_HIGHLIGHT_TEMPLATES[name.slice(8)] ? BUILTIN_HIGHLIGHT_TEMPLATES[name.slice(8)](ev) : '';
-    if (html) { const old = v('hl-body'); set('hl-body', old ? old + '\\n\\n' + html : html); toast('Built-in highlight template added', 's'); }
+    if (html) { const old = v('hl-body'); set('hl-body', old ? old + '\n\n' + html : html); toast('Built-in highlight template added', 's'); }
     return;
   }
   const t = templates[name];
-  if (t?.body) { const old = v('hl-body'); set('hl-body', old ? old + '\\n\\n' + t.body : t.body); toast('Highlight template loaded', 's'); }
+  if (t?.body) { const old = v('hl-body'); set('hl-body', old ? old + '\n\n' + t.body : t.body); toast('Highlight template loaded', 's'); }
 }
 function renderTemplateList() {
   const el = document.getElementById('template-list');
@@ -5583,7 +5589,7 @@ function applyConfigToUI() {
   if (document.getElementById('cfg-embed-streams-in-post')) document.getElementById('cfg-embed-streams-in-post').checked = CFG.embedStreamsInPost !== false;
   set('cfg-deepseek-key', CFG.deepseekKey || '');
   set('cfg-deepseek-tone', CFG.deepseekTone || '');
-  if (document.getElementById('cfg-deepseek-model')) document.getElementById('cfg-deepseek-model').value = CFG.deepseekModel || 'claude-sonnet-4-20250514';
+  if (document.getElementById('cfg-deepseek-model')) document.getElementById('cfg-deepseek-model').value = CFG.deepseekModel || 'claude-sonnet-5';
   if (document.getElementById('cfg-deepseek-length')) document.getElementById('cfg-deepseek-length').value = CFG.deepseekLength || 'medium';
   updateClaudeStatus();
 }
