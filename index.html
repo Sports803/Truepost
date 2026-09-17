@@ -3742,7 +3742,7 @@ function renderMatchCard(ev) {
     '<div style="display:flex;flex-direction:column;align-items:center"><div class="ec-vs">' + (ev.home.score !== '' ? ev.home.score + ' – ' + ev.away.score : 'vs') + '</div><div class="ec-time">' + ts + '</div></div>' +
     '<div class="ec-team">' + aChip + '<div class="ec-team-name">' + ev.away.name + '</div></div></div>' +
     (pl?.postUrl ? '<div style="font-size:.62rem;color:var(--muted2)">📝 <a href="' + pl.postUrl + '" target="_blank" style="color:var(--blue)">View post</a></div>' : '') +
-    '<div class="ec-actions"><button class="btn-red btn-sm" onclick="genAndFill(\'' + sid + '\')">✍️ Gen</button><button class="btn-blue btn-sm" onclick="quickPostEv(\'' + sid + '\')">📤 Post</button><button class="btn-gold btn-sm" onclick="genThumbForEv(\'' + sid + '\')">🖼️ Thumb</button><button class="btn-orange btn-sm" onclick="openHLForEv(\'' + sid + '\')">🎬 HL</button></div></div>';
+    '<div class="ec-actions"><button class="btn-red btn-sm" onclick="genAndFill(\'' + sid + '\')">✍️ Gen</button><button class="btn-blue btn-sm" onclick="quickPostEv(\'' + sid + '\')">📤 Post</button><button class="btn-gold btn-sm" onclick="genThumbForEv(\'' + sid + '\')">🖼️ Thumb</button><button class="btn-orange btn-sm" onclick="openHLForEv(\'' + sid + '\')">🎬 HL</button><button class="btn-blue btn-sm" onclick="postHLForEv(\' + sid + \')">📤 Post HL</button></div></div>';
 }
 
 function renderRaceCard(ev) {
@@ -4861,6 +4861,13 @@ function populateHLSelect() {
   }).join('');
 }
 
+function postHLForEv(sid) {
+  const ev = findEv(sid);
+  if (!ev) { toast('Event not found', 'e'); return; }
+  if (!accessToken) { toast('Sign in first', 'e'); return; }
+  openHLForEv(sid);
+  toast('Highlight editor opened — generate or review the text, then click Post / Update.', 'i');
+}
 function openHLForEv(sid) {
   refreshHighlightTemplateSelect();
   populateHLSelect();
