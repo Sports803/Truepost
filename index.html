@@ -5211,6 +5211,7 @@ function addRecentPost(title, url, status) {
   d.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px';
   d.innerHTML = '<span class="post-badge ' + (status || '').toLowerCase() + '">' + status + '</span><span style="flex:1;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + title + '</span>' + (url ? '<a href="' + url + '" target="_blank" style="font-size:.68rem;color:var(--blue)">View</a>' : '');
   list.prepend(d);
+  while (list.children.length > 100) list.removeChild(list.lastElementChild);
   updateStats();
 }
 
@@ -5689,7 +5690,7 @@ window.buildRichHighlightSections=function(ev){const h=ev.home?.name||'Home',a=e
     if(!accessToken){toast('Sign in first','e');return;}
     const finished=allEvents.filter(ev=>ev.type==='match'&&STATUS.isFinished(ev.status));
     if(!finished.length){toast('No finished matches found. Set the date picker to the correct day and click Fetch All first.','i');return;}
-    for(const ev of finished){const pl=getLog(ev);if(pl?.hasHL&&pl.postId&&!pl.hlUrl){const post=await fetchPostBody(pl.postId);const url=highlightUrlFromBody(post?.content);if(url)setLog(ev,{hlUrl:url,replayUrl:url});}}
+    for(const ev of finished){const pl=getLog(ev);if(pl?.postId&&!pl.hlUrl){const post=await fetchPostBody(pl.postId);const url=highlightUrlFromBody(post?.content);if(url)setLog(ev,{hasHL:true,hlUrl:url,replayUrl:url});}}
     return bulkHLOriginal();
   };
   // Rebind manual URL preview without changing existing UI.
