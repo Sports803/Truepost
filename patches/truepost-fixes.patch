@@ -1,1 +1,40 @@
-PLACEHOLDER_WILL_REPLACE
+--- a/index.html
++++ b/index.html
+@@ -1300,4 +1300,37 @@
+   .mobile-drawer, .mobile-menu-backdrop { display: none !important; }
+ }
++
++/* ===== FIXES: event cards & race cards ===== */
++.event-card .ec-team img,
++.event-card .ec-logo {
++  width: 28px;
++  height: 28px;
++  object-fit: contain;
++  flex-shrink: 0;
++}
++.race-card {
++  background: var(--bg2);
++  border: 1px solid var(--border);
++  border-radius: var(--r2);
++  overflow: hidden;
++  display: flex;
++  flex-direction: column;
++}
++.race-card-body { padding: 12px 14px; }
++.race-card-title {
++  font-family: var(--cond);
++  font-weight: 800;
++  font-size: .95rem;
++  margin: 4px 0 8px;
++  line-height: 1.25;
++}
++.race-card-meta {
++  font-size: .65rem;
++  color: var(--muted2);
++  text-transform: uppercase;
++  letter-spacing: .4px;
++}
++#draft-saved-pill { pointer-events: none; }
++
+ </style>
+ </head>
