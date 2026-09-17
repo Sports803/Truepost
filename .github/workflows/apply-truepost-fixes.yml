@@ -1,0 +1,38 @@
+name: Apply Truepost fixes patch
+on:
+  push:
+    paths:
+      - 'patches/truepost-fixes.patch'
+      - '.github/workflows/apply-truepost-fixes.yml'
+  workflow_dispatch:
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: |
+          set -e
+          if patch -p1 --forward --dry-run < patches/truepost-fixes.patch; then
+            patch -p1 --forward < patches/truepost-fixes.patch
+          else
+            echo "Patch already applied or does not match; checking markers..."
+            grep -q "saveCurrentAsTemplate" index.html
+          fi
+      - name: Sync wordpress dashboard copy
+        run: |
+          cp index.html wordpress-plugin/sports-803-publisher/dashboard.html || true
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html wordpress-plugin/sports-803-publisher/dashboard.html || true
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Apply Truepost dashboard fixes from patch"
+            git push
+          fi
