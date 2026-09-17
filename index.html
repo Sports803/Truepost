@@ -2212,6 +2212,7 @@ let fullRacesData = [];
 let tbGenCount = 0, composeGenCount = 0;
 let externalStreamsMap = {}, ddkanquCache = {}, ddkanquMappings = {}, ddkanquHomeMap = {}, oneTVHomeMap = {}, ppvTVHomeMap = {};
 let dsArticleCache = {};
+let dsArticleCacheOrder = [];
 let templates = {};
 let draftAutoSaveTimer = null;
 
@@ -3084,6 +3085,13 @@ async function fetchLeague(league) {
   }
 }
 
+async function loadExternalStreams() {
+  const loaders = [];
+  if (typeof loadDDKanquHome === 'function') loaders.push(loadDDKanquHome());
+  if (typeof loadOneTVStreams === 'function') loaders.push(loadOneTVStreams());
+  if (typeof loadPPVTVStreams === 'function') loaders.push(loadPPVTVStreams());
+  await Promise.allSettled(loaders);
+}
 function parseESPN(ev, league) {
   const comp = ev.competitions?.[0] || {};
   const comps = comp.competitors || [];
@@ -3101,14 +3109,15 @@ function parseESPN(ev, league) {
   }
   const home = comps.find(c => c.homeAway === 'home') || comps[0] || {};
   const away = comps.find(c => c.homeAway === 'away') || comps[1] || {};
+  const display = c => c.team?.displayName || c.athlete?.displayName || c.athlete?.fullName || c.displayName || c.name || 'TBD';
   const getRawLogo = c => {
     const href = (c.team?.logos?.find(l => l.href && l.width >= 50) || c.team?.logos?.[0])?.href || '';
     return href ? href.replace(/^http:\/\//i, 'https://') : '';
   };
   return {
     id: ev.id, league, type: 'match',
-    home: { name: home.team?.displayName || 'TBD', logo: getRawLogo(home), score: home.score ?? '' },
-    away: { name: away.team?.displayName || 'TBD', logo: getRawLogo(away), score: away.score ?? '' },
+    home: { name: display(home), logo: getRawLogo(home), score: home.score ?? '' },
+    away: { name: display(away), logo: getRawLogo(away), score: away.score ?? '' },
     status, startTime
   };
 }
@@ -3120,7 +3129,7 @@ function wsrv(url, size = 200) {
   if (!url || url.startsWith('data:') || url.startsWith('blob:')) return url;
   return 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=' + size + '&h=' + size + '&fit=contain&n=-1&we';
 }
-const TSDB_INFLIGHT = new Set();
+const TSDB_INFLIGHT = new Map();
 const LOGO_TTL = 7 * 86400000, LOGO_FAILURE_TTL = 10 * 60000;
 let tsdbNextRequest = 0, tsdbBackoffUntil = 0;
 async function fetchLogo(teamName) {
@@ -3128,9 +3137,8 @@ async function fetchLogo(teamName) {
   const key = teamName.toLowerCase().trim();
   if (LOGO_OVERRIDES[key]) return LOGO_OVERRIDES[key];
   const cached = LOGO_CACHE[key]; if (cached && (Date.now() - (cached.ts || 0) < (cached.url ? LOGO_TTL : LOGO_FAILURE_TTL))) return cached.url || ''; if (cached) delete LOGO_CACHE[key];
-  if (TSDB_INFLIGHT.has(key)) { await new Promise(r => setTimeout(r, 2500)); return LOGO_CACHE[key] || ''; }
-  TSDB_INFLIGHT.add(key);
-  try { const wait = Math.max(0, tsdbNextRequest - Date.now(), tsdbBackoffUntil - Date.now()); if (wait) await new Promise(r => setTimeout(r, wait)); tsdbNextRequest = Date.now() + 2200;
+  if (TSDB_INFLIGHT.has(key)) return TSDB_INFLIGHT.get(key);
+  const request = (async () => { try { const wait = Math.max(0, tsdbNextRequest - Date.now(), tsdbBackoffUntil - Date.now()); if (wait) await new Promise(r => setTimeout(r, wait)); tsdbNextRequest = Date.now() + 2200;
     const res = await fetch(TSDB + '/searchteams.php?t=' + encodeURIComponent(teamName));
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -3143,7 +3151,9 @@ async function fetchLogo(teamName) {
     LOGO_CACHE[key] = { url: '', ts: Date.now() }; if (/429/.test(e.message || '')) tsdbBackoffUntil = Date.now() + 30000; return '';
   } finally {
     TSDB_INFLIGHT.delete(key);
-  }
+  } })();
+  TSDB_INFLIGHT.set(key, request);
+  return request;
 }
 
 async function enrichLogos(events) {
@@ -3158,7 +3168,7 @@ async function enrichLogos(events) {
   const toFetch = [...needsFetch];
   for (let i = 0; i < toFetch.length; i += 6) {
     await Promise.allSettled(toFetch.slice(i, i + 6).map(t => fetchLogo(t)));
-    if (i + 6 < toFetch.length) await new Promise(r => setTimeout(r, 80));
+    if (i + 6 < toFetch.length) await Promise.all([...TSDB_INFLIGHT.values()]);
   }
   let total = 0, resolved = 0;
   for (const ev of matchEvs) {
@@ -3922,7 +3932,7 @@ async function bulkPostAll() {
   toast('Bulk posting ' + toPost.length + ' events…', 'i');
   for (const ev of toPost) {
     await quickPostEv(encodeURIComponent(String(ev.id)));
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise(r => setTimeout(r, 9000));
   }
   toast('Bulk post complete ✓', 's');
 }
@@ -4666,7 +4676,7 @@ function buildRacePlayerIframe(race) {
     return type + '=' + encodeURIComponent(s.url);
   }).join('&');
   const src = playerBase + '?' + params;
-  return '<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe loading="lazy" sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" allow="encrypted-media" style="position:absolute;top:0;left:0;width:100%;height:0;border:0" src="' + src + '" frameborder="0" scrolling="no" allowfullscreen></iframe></div>';
+  return '<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe loading="lazy" sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" allow="encrypted-media" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" src="' + src + '" frameborder="0" scrolling="no" allowfullscreen></iframe></div>';
 }
 
 function renderFullRaces(races) {
@@ -5275,6 +5285,7 @@ function showPage(id) {
   if (page) page.classList.add('active');
   document.querySelectorAll('.nav-pill').forEach(b => { if (b.getAttribute('onclick')?.includes("'" + id + "'")) b.classList.add('active'); });
   document.querySelectorAll('.mobile-nav-pill').forEach(b => b.classList.toggle('active', b.dataset.mobilePage === id));
+  if (id === 'compose') loadDraft();
   if (id === 'fullraces' && fullRacesData.length) renderFullRaces(fullRacesData);
   if (id === 'templates') renderTemplateList();
   closeMobileMenu();
@@ -5407,7 +5418,7 @@ function updateSEO() {
   document.getElementById('seo-l-score').textContent = lb + ' labels';
 }
 
-function previewPost() { document.getElementById('preview-title').textContent = v('post-title'); document.getElementById('preview-body').innerHTML = document.getElementById('post-body').value.replace(/\n/g, '<br>'); openModal('modal-preview'); }
+function previewPost() { document.getElementById('preview-title').textContent = v('post-title'); const src=document.getElementById('post-body').value.replace(/\n/g, '<br>'); const doc=new DOMParser().parseFromString(src,'text/html'); doc.querySelectorAll('script,style,object,embed,iframe').forEach(n=>n.remove()); doc.querySelectorAll('*').forEach(n=>{[...n.attributes].forEach(a=>{if(/^on/i.test(a.name)||(/^(href|src)$/i.test(a.name)&&/^javascript:/i.test(a.value)))n.removeAttribute(a.name);});}); document.getElementById('preview-body').replaceChildren(...[...doc.body.childNodes].map(n=>document.importNode(n,true))); openModal('modal-preview'); }
 
 // ============================================================
 //  BUILD ARTICLE WITH STREAMS (with race support)
@@ -5425,12 +5436,12 @@ async function buildArticleWithStreams(title, ev, isHighlights = false) {
 
 async function buildArticleWithClaude(title, ev, isHighlights = false) {
   const cacheKey = (ev ? evKey(ev) : title) + (isHighlights ? '|hl' : '');
-  if (dsArticleCache[cacheKey]) return dsArticleCache[cacheKey];
+  if (dsArticleCache[cacheKey]) { dsArticleCacheOrder = [cacheKey, ...dsArticleCacheOrder.filter(k => k !== cacheKey)]; return dsArticleCache[cacheKey]; }
   if (CFG.deepseekKey) {
     try {
       const prompt = buildClaudePrompt(title, ev, isHighlights);
       const article = await callClaude(prompt);
-      dsArticleCache[cacheKey] = article; const keys=Object.keys(dsArticleCache); if(keys.length>100) delete dsArticleCache[keys[0]];
+      dsArticleCache[cacheKey] = article; dsArticleCacheOrder = [cacheKey, ...dsArticleCacheOrder.filter(k => k !== cacheKey)]; while (dsArticleCacheOrder.length > 100) delete dsArticleCache[dsArticleCacheOrder.pop()];
       return article;
     } catch (e) { console.warn('[Claude] Article gen failed, using fallback:', e.message); }
   }
@@ -5590,7 +5601,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateIframeBox();
   // Restore only the current event's draft after explicit confirmation.
   updateSearchDescriptionCount();
-  loadDraft();
+  // Drafts are restored only when the user explicitly opens Compose.
   const cv = document.getElementById('compose-canvas');
   const ctx = cv.getContext('2d');
   ctx.fillStyle = '#0c1018';
@@ -5659,6 +5670,28 @@ window.buildRichHighlightSections=function(ev){const h=ev.home?.name||'Home',a=e
   window.syncPostLogFromBlogger=async function(){if(!accessToken||!CFG.blogId){toast('Sign in and set Blog ID first','w');return}try{let pageToken='',items=[];do{const q='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts?maxResults=500&fetchBodies=false'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');const r=await fetch(q,{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();items.push(...(d.items||[]));pageToken=d.nextPageToken||'';}while(pageToken);let synced=0;items.forEach(p=>{const labels=p.labels||[];const markers=labels.filter(x=>x.indexOf('s803:')===0);if(!markers.length){const title=String(p.title||'').toLowerCase();const match=allEvents.find(ev=>{const a=(ev.home?.name||ev.name||'').toLowerCase(),b=(ev.away?.name||'').toLowerCase();return a&&title.includes(a)&&(b?title.includes(b):true)});if(match)markers.push('s803:'+evKey(match));}markers.forEach(marker=>{const k=marker.slice(5);if(!k||k==='hl')return;postLog[k]={...(postLog[k]||{}),postId:p.id,postUrl:p.url,title:p.title,status:p.status,searchDescription:p.searchDescription||postLog[k]?.searchDescription||'',bloggerSyncedAt:Date.now(),ts:postLog[k]?.ts||Date.now()};synced++;});});saveV10();renderPostLog();renderPostLogDiagnostics();updateStats();toast('Synced '+synced+' Sports 803 post IDs/URLs from Blogger ✓','s')}catch(e){toast('Blogger sync failed: '+e.message,'e')}};
   window.renderPostLogDiagnostics=function(){const el=document.getElementById('post-log-diagnostics-body');if(!el)return;const es=logEntries();const ids={};es.forEach(([k,v])=>{if(v.postId)(ids[v.postId]??=[]).push(k)});const dup=Object.entries(ids).filter(([,ks])=>ks.length>1).map(([id])=>id);el.innerHTML='Total entries: '+es.length+' · with postId: '+es.filter(([,v])=>v.postId).length+' · hasHL: '+es.filter(([,v])=>v.hasHL).length+' · duplicate postIds: '+(dup.join(', ')||'none')+' · orphaned race keys: '+es.filter(([k])=>k.startsWith('race_')).length;};
   window.repairPostLog=function(){postLog=migratePostLog(postLog);prunePostLog();saveV10();renderPostLog();renderPostLogDiagnostics();toast('Post log repaired ✓','s');};
+  function highlightUrlFromBody(html){ const raw=String(html||''); const m=raw.match(/(?:src|data-url)=["']([^"']*(?:replay|oneball|player)[^"']*)["']/i); return m?m[1]:''; }
+  window.postHighlights=async function(){
+    if(!accessToken){toast('Sign in first','e');return;}
+    const ev=allEvents[parseInt(v('hl-select'))]; if(!ev){toast('Select an event first','w');return;}
+    const body=v('hl-body'), manual=v('hl-manual-post-url'); if(!body){toast('Write/generate text first','i');return;}
+    if(manual){const id=await resolvePostUrlToId(manual);if(!id){toast('Could not resolve this URL — check the post still exists.','e');return}const pl=getLog(ev);if(pl?.postId&&String(pl.postId)!==String(id)&&!document.getElementById('hl-override-confirm')?.checked){toast('Confirm the manual override first','w');return}setLog(ev,{postId:id,postUrl:manual});}
+    const pl=getLog(ev), video=v('hl-video'), thumb=v('hl-thumb-url'), title=(ev.home?.name||ev.name)+' vs '+(ev.away?.name||'')+' – Highlights & Replay | Sports 803';
+    setSEOEvent(ev); ensureSearchDescription(title,body,ev,true);
+    let enrichedBody=body; if(!/Match Overview|Match Details/i.test(enrichedBody)||enrichedBody.trim().split(/\s+/).length<350) enrichedBody+='\n\n'+buildRichHighlightSections(ev);
+    let html=''; if(thumb) html+='<div id="s803-hl-thumb"><img src="'+thumb+'" style="max-width:100%;height:auto;border-radius:10px;margin-bottom:18px"></div>\n'; html+=stripInjectedBlocks(enrichedBody); if(video) html+='\n\n'+buildHighlightsPlayerIframe(video);
+    const status=v('hl-post-status')||'LIVE', post=pl?.postId?await updateExistingPost(ev,title,html,status,getLabels(ev)):await postRaw(title,html,status,getLabels(ev));
+    if(post){setLog(ev,{postId:post.id,postUrl:post.url,title,hasHL:true,status,thumb:thumb||pl?.thumb||null});toast(status==='LIVE'?'Highlights published ✓':'Highlights saved as draft ✓','s');closeModal('modal-hl');renderEventCards(allEvents);}
+  };
+  // Recover replay URLs from already-posted Blogger highlight bodies before deciding an update is impossible.
+  const bulkHLOriginal=window.bulkPostHighlights;
+  window.bulkPostHighlights=async function(){
+    if(!accessToken){toast('Sign in first','e');return;}
+    const finished=allEvents.filter(ev=>ev.type==='match'&&STATUS.isFinished(ev.status));
+    if(!finished.length){toast('No finished matches found. Set the date picker to the correct day and click Fetch All first.','i');return;}
+    for(const ev of finished){const pl=getLog(ev);if(pl?.hasHL&&pl.postId&&!pl.hlUrl){const post=await fetchPostBody(pl.postId);const url=highlightUrlFromBody(post?.content);if(url)setLog(ev,{hlUrl:url,replayUrl:url});}}
+    return bulkHLOriginal();
+  };
   // Rebind manual URL preview without changing existing UI.
   document.addEventListener('input',e=>{if(e.target.id==='hl-manual-post-url')updateHLResolution();});
   renderPostLogDiagnostics();
