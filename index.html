@@ -1487,6 +1487,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
       <button class="btn-red" onclick="fetchAllEvents()"><span id="fetch-spinner" style="display:none" class="spinner"></span>🔄 Fetch All</button>
       <button class="btn-gold" onclick="bulkGenThumbs()">🖼️ Bulk Gen Thumbs</button>
       <button class="btn-green" onclick="bulkPostAll()">📤 Bulk Post</button>
+      <button class="btn-orange" onclick="bulkPostHighlights()">🎬 Bulk Highlights</button>
       <button class="btn-orange" onclick="fetchAllOneBallHighlights()">🎬 Fetch All HL</button>
     </div>
   </div>
@@ -1525,7 +1526,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
         <div class="card-title">Post Details</div>
         <div class="form-group">
           <label>Post Title — <span style="color:var(--gold);font-size:.65rem">Auto-parses team names &amp; generates thumbnail</span></label>
-          <input type="text" id="post-title" placeholder="e.g. Manchester City vs Arsenal – Premier League Preview" oninput="onTitleChange()">
+          <input type="text" id="post-title" placeholder="e.g. Manchester City vs Arsenal – Premier League Preview" oninput="onTitleChange();ensureSearchDescription()">
           <div id="title-parsed" style="margin-top:6px;display:none" class="parsed-teams">
             <span class="parsed-home" id="tp-home"></span><span class="parsed-vs">VS</span><span class="parsed-away" id="tp-away"></span>
             <span id="tp-auto-gen" style="margin-left:auto;font-size:.6rem;color:var(--green);font-family:var(--cond)">⚡ Auto-generating…</span>
@@ -1570,7 +1571,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
             <button class="tpl-btn" onclick="Compose.insertTemplate('cta')">+ Stream CTA</button>
             <button class="tpl-btn" onclick="Compose.insertTemplate('highlights')">+ Highlights Recap</button>
           </div>
-          <textarea id="post-body" rows="14" placeholder="Write or insert a template above…" oninput="updateSEO();autoSaveDraft()"></textarea>
+          <textarea id="post-body" rows="14" placeholder="Write or insert a template above…" oninput="updateSEO();ensureSearchDescription();autoSaveDraft()"></textarea>
         </div>
         <div class="form-row">
           <div><label>Labels</label><input type="text" id="post-labels" value="sports 803,live " oninput="updateSEO()"></div>
@@ -2871,8 +2872,8 @@ function refreshBloggerBlogs() {
 async function postToBlogger() {
   if (!accessToken) { toast('Sign in first', 'e'); return; }
   if (!CFG.blogId) { toast('Enter Blog ID in Settings', 'e'); return; }
-  const t = v('post-title'), b = document.getElementById('post-body').value.trim(), st = v('post-status'); const searchDescription = (v('post-search-description') || makeSearchDescription(t,b)).slice(0,150);
-  const labels = v('post-labels').split(',').map(s => s.trim()).filter(Boolean);
+  const t = v('post-title'), b = document.getElementById('post-body').value.trim(), st = v('post-status'); const searchDescription = ensureSearchDescription(t,b) || makeSearchDescription(t,b);
+  const labels = [...new Set([...v('post-labels').split(',').map(s => s.trim()).filter(Boolean), ...(currentComposeEv ? getLabels(currentComposeEv) : currentComposeRace ? getLabels(currentComposeRace) : [])])];
   if (!t || !b) { toast('Title and body required', 'e'); return; }
 
   // Thumbnail
@@ -2921,7 +2922,7 @@ async function postRaw(title, html, status, labels, publishDate = null) {
   let url = 'https://www.googleapis.com/blogger/v3/blogs/' + CFG.blogId + '/posts/';
   const isLive = status === 'LIVE';
   if (!isLive) url += '?isDraft=true';
-  const body = { kind: 'blogger#post', blog: { id: CFG.blogId }, title, content: html, labels: labels || ['sports 803', 'live '], searchDescription: (v('post-search-description') || makeSearchDescription(title, html)).slice(0,150) };
+  const body = { kind: 'blogger#post', blog: { id: CFG.blogId }, title, content: html, labels: labels || ['sports 803', 'live '], searchDescription: (ensureSearchDescription(title, html) || makeSearchDescription(title, html)).slice(0,150) };
   if (publishDate && isLive) body.published = publishDate;
   try {
     const res = await fetch(url, { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -3732,6 +3733,7 @@ async function genAndFill(sid) {
   toast(fin ? 'Generating highlights article…' : 'Generating article…', 'i');
   const body = await buildArticleWithStreams(title, ev, fin);
   document.getElementById('post-body').value = body;
+  ensureSearchDescription(title, body);
   document.getElementById('post-labels').value = getLabels(ev).join(', ');
   set('c-league', ev.league.name);
   set('c-datetime', ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
@@ -3841,12 +3843,34 @@ async function bulkPostAll() {
   }
   toast('Bulk post complete ✓', 's');
 }
+async function bulkPostHighlights() {
+  if (!accessToken) { toast('Sign in first', 'e'); return; }
+  const candidates = allEvents.filter(ev => ev.type === 'match' && STATUS.isFinal(ev.status) && !getLog(ev)?.hasHL);
+  if (!candidates.length) { toast('No unposted finished match highlights found', 'i'); return; }
+  let posted=0, failed=0; toast('Bulk highlights: 0/' + candidates.length, 'i');
+  for (const ev of candidates) {
+    try {
+      let pl=getLog(ev);
+      const found=pl?.hlUrl ? {playerUrl:pl.hlUrl,replayUrl:pl.replayUrl} : await searchOneBallHighlights(ev);
+      if (!found?.playerUrl) { failed++; continue; }
+      const title=ev.home.name+' vs '+ev.away.name+' – Highlights & Replay | Sports 803';
+      const body=await buildArticleWithClaude(title,ev,true);
+      const html=body+'\n\n'+buildHighlightsPlayerIframe(found.playerUrl);
+      const post=await postRaw(title,html,CFG.schedStatus||'DRAFT',getLabels(ev));
+      if (!post) { failed++; if(failed>=3){toast('Bulk highlights stopped after 3 failures','e');break;} continue; }
+      setLog(ev,{postId:post.id,postUrl:post.url,title,hasHL:true,hlUrl:found.playerUrl,replayUrl:found.replayUrl||'',status:CFG.schedStatus||'DRAFT'});
+      posted++; toast('Bulk highlights: '+posted+'/'+candidates.length,'i'); await new Promise(r=>setTimeout(r,1500));
+    } catch(e) { failed++; console.warn('[bulk highlights]',e); if(failed>=3) break; }
+  }
+  renderEventCards(allEvents); toast('Bulk highlights complete: '+posted+' posted, '+failed+' failed','s');
+}
 
 function getLabels(ev) {
   const league = typeof ev?.league === 'string' ? { name: ev.league } : (ev?.league || {});
   const dynamic = [league.name, league.id, league.sport, league.type === 'race' ? 'Motorsport' : 'Sports', 'Sports 803'].filter(Boolean);
   const aliases = { soccer: ['Football', 'Football Live Stream'], basketball: ['Basketball', 'Basketball Live Stream'], football: ['American Football', 'Football Live Stream'], hockey: ['Ice Hockey', 'Hockey Live Stream'], tennis: ['Tennis', 'Tennis Live Stream'], baseball: ['Baseball', 'Baseball Live Stream'], racing: ['Motorsport', 'Live Racing'], golf: ['Golf', 'Golf Live Stream'], mma: ['MMA', 'Combat Sports'], cycling: ['Cycling', 'Cycling Live Stream'] }[league.sport] || ['Live Sports'];
-  return [...new Set([...dynamic, ...aliases, ...(ev.home?.name ? [ev.home.name] : []), ...(ev.away?.name ? [ev.away.name] : [])])];
+  const stable = typeof evKey === 'function' ? 's803:' + evKey(ev) : '';
+  return [...new Set([...dynamic, ...aliases, stable, ...(ev.home?.name ? [ev.home.name] : []), ...(ev.away?.name ? [ev.away.name] : [])].filter(Boolean))];
 }
 
 async function genThumbForEv(sid) {
@@ -4342,13 +4366,24 @@ async function testDDKanquLookup() {
 // ============================================================
 //  HIGHLIGHTS PLAYER
 // ============================================================
+function canonicalOneBallReplayUrl(url) {
+  let raw = String(url || '').trim();
+  try {
+    const parsed = new URL(raw, 'https://oneball.live');
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const id = (parts.pop() || '').replace(/\.html?$/i, '');
+    if (/^\d+$/.test(id)) return 'https://oneball.live/replay/' + id + '.html';
+    raw = parsed.href;
+  } catch (e) {}
+  return raw.replace('https://oneball.live//', 'https://oneball.live/');
+}
+function playerBaseUrl() { return (CFG.playerBase || 'https://sports803.github.io/player/').replace(/\/?$/, '/') ; }
 function buildHighlightsPlayerIframe(url) {
   if (!url) return '';
-  const playerBase = CFG.playerBase || 'https://sports803.github.io/player/';
-  let src = url;
-  if (!url.includes('?mora=') && !url.includes('&mora=')) {
-    src = playerBase + (playerBase.includes('?') ? '&' : '?') + 'mora=' + encodeURIComponent(url);
-  }
+  const replay = canonicalOneBallReplayUrl(url);
+  const playerBase = playerBaseUrl();
+  let src = replay;
+  if (!replay.includes('?mora=') && !replay.includes('&mora=') && !replay.includes('?one=') && !replay.includes('&one=')) src = playerBase + '?one=' + replay;
   return '<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px"><iframe loading="lazy" src="' + src + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:10px" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>';
 }
 
@@ -4417,7 +4452,7 @@ async function searchOneBallHighlights(ev) {
   const links=[...doc.querySelectorAll('a[href]')]; for(const a of links){if(oneBallMatchFound(a.textContent+' '+a.getAttribute('href'),home,away)){try{matchUrl=new URL(a.getAttribute('href'), 'https://oneball.live').href}catch(e){} if(matchUrl)break;}}
   if(!matchUrl){const md=listHtml.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+\/replay\/[^\s)]+)\)/gi)||[];for(const x of md){const q=x.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/i);if(q&&oneBallMatchFound(q[1],home,away)){matchUrl=q[2];break}}}
   if(!matchUrl){toast('No matching replay found on OneBall for '+home+' vs '+away,'w');return null;}
-  const canonical=matchUrl.split('?')[0]; const playerBase=(CFG.playerBase||'https://sports803.github.io/player').replace(/\/$/,''); const playerUrl=playerBase+'?one='+canonical;
+  const canonical=canonicalOneBallReplayUrl(matchUrl.split('?')[0]); const playerUrl=playerBaseUrl()+'?one='+canonical;
   const result={url:playerUrl,playerUrl,replayUrl:canonical,title:home+' vs '+away+' Highlights'};
   setLog(ev,{hasHL:true,hlUrl:playerUrl,replayUrl:canonical,oneMatchId:extractReplayId(canonical),hlCanonical:canonical,hlFetchedAt:Date.now()});
   return result;
@@ -5245,6 +5280,7 @@ function sendTBToCompose() {
 //  SEO
 // ============================================================
 function updateSearchDescriptionCount(){const el=document.getElementById('post-search-description'),c=document.getElementById('search-description-count');if(el&&c){c.textContent=el.value.length+'/150';c.style.color=el.value.length>=120&&el.value.length<=150?'var(--green)':'var(--muted2)';}}
+function ensureSearchDescription(title=v('post-title'), body=document.getElementById('post-body')?.value||''){const el=document.getElementById('post-search-description');if(!el)return '';if(!el.value.trim())el.value=makeSearchDescription(title,body);updateSearchDescriptionCount();return el.value.trim().slice(0,150);}
 function makeSearchDescription(title, body){const text=String(body||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();return (text||title||'Sports 803 live sports coverage').slice(0,150);}
 
 function updateSEO() {
@@ -5489,12 +5525,12 @@ document.addEventListener('DOMContentLoaded', () => {
   window.extractPostIdFromUrl=function(url){const x=String(url||'').trim(),m1=x.match(/blogger\.com\/blog\/post\/edit\/\d+\/(\d{10,})/i),m2=x.match(/\/posts\/(\d{10,})/i),m3=x.match(/^(\d{10,})$/);return m1?.[1]||m2?.[1]||m3?.[1]||null;};
   window.resolvePostUrlToId=async function(url){const direct=extractPostIdFromUrl(url);if(direct)return direct;let u;try{u=new URL(String(url).trim())}catch(e){return null}const path=decodeURIComponent(u.pathname||'');if(!/^\/\d{4}\/\d{2}\/.+\.html$/i.test(path))return null;const key=(u.origin+path).toLowerCase();const cache=postLog.__urlCache||{};if(cache[key])return cache[key];if(!accessToken||!CFG.blogId)return null;try{const r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/bypath?path='+encodeURIComponent(path),{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)return null;const d=await r.json();if(!d.id)return null;postLog.__urlCache={...cache,[key]:d.id};saveV10();return d.id}catch(e){console.warn('[resolvePostUrlToId]',e.message);return null}};
   window.stripInjectedBlocks=function(html){return String(html||'').replace(/<div id="s803-highlights-player"[\s\S]*?<\/div>\s*(?=<|$)/gi,'').replace(/<div id="s803-hl-thumb"[\s\S]*?<\/div>\s*(?=<|$)/gi,'');};
-  window.buildHighlightsPlayerIframe=function(url){if(!url)return '';const canonical=String(url).split('?')[0],base=(CFG.playerBase||'https://sports803.github.io/player').replace(/\/$/,'');let src=url;if(!url.includes('?mora=')&&!url.includes('&mora=')&&!url.includes('?one=')&&!url.includes('&one='))src=base+(base.includes('?')?'&':'?')+'one='+url;return '<div id="s803-highlights-player" data-canonical="'+canonical.replace(/"/g,'&quot;')+'" style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px"><iframe loading="lazy" src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:10px" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>';};
+  window.buildHighlightsPlayerIframe=function(url){if(!url)return '';const canonical=canonicalOneBallReplayUrl(String(url).split('?')[0]),base=playerBaseUrl();let src=String(url);if(!src.includes('?mora=')&&!src.includes('&mora=')&&!src.includes('?one=')&&!src.includes('&one='))src=base+'?one='+canonical;return '<div id="s803-highlights-player" data-canonical="'+canonical.replace(/"/g,'&quot;')+'" style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px"><iframe loading="lazy" src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:10px" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>';};
   window.getLabels=function(ev){const base={ucl:['UEFA Champions League','UCL','Football Live Stream','Sports 803'],epl:['Premier League','EPL','Football Live Stream','Sports 803'],laliga:['La Liga','Spanish Football','Football Live Stream','Sports 803'],seriea:['Serie A','Italian Football','Sports 803'],bundesliga:['Bundesliga','German Football','Sports 803'],f1:['Formula 1','F1','Grand Prix','Sports 803'],nba:['NBA','Basketball','Sports 803'],nfl:['NFL','American Football','Sports 803'],ufc:['UFC','MMA','Sports 803']}[ev.league?.id]||['Sports 803'];return [...new Set([...base,'s803:'+evKey(ev),...(ev.home?.name?[ev.home.name]:[]),...(ev.away?.name?[ev.away.name]:[])])];};
   window.STATUS={isFinal:s=>/\b(final|ft|full[\s-]?time|ended|finished|completed|aet|penalties|post[\s-]?match)\b/i.test(s||''),isLive:s=>/\b(in[\s-]?progress|live|halftime|half[\s-]?time|1st half|2nd half|end of regulation|overtime|ot)\b/i.test(s||''),isDead:s=>/\b(postponed|cancel(l)?ed|suspended|abandoned|delayed)\b/i.test(s||''),isSched:s=>!STATUS.isFinal(s)&&!STATUS.isLive(s)&&!STATUS.isDead(s),badgeClass:s=>STATUS.isLive(s)?'live':STATUS.isFinal(s)?'final':STATUS.isDead(s)?'dead':'sched',label:s=>s||'Scheduled'};
   window.fetchPostBody=async function(postId){if(!accessToken||!CFG.blogId)return null;const id=extractPostIdFromUrl(postId)||await resolvePostUrlToId(postId);if(!id)return null;try{const r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+id,{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();return {id:d.id,title:d.title||'',content:d.content||'',labels:d.labels||[],url:d.url||''};}catch(e){console.warn('[fetchPostBody]',e.message);return null;}};
-  window.postRaw=async function(title,html,status,labels,publishDate=null){if(!CFG.blogId||!accessToken)return null;let url='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+(status==='LIVE'?'':'?isDraft=true');let r,last; for(let attempt=0;attempt<4;attempt++){try{r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({kind:'blogger#post',blog:{id:CFG.blogId},title,content:html,labels:labels||['Sports 803'],searchDescription:(v('post-search-description')||makeSearchDescription(title,html)).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})})}); if(r.ok)return r.json(); last=r.status; if(![429,500,502,503,504].includes(r.status))break; await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}} toast('Post failed after retries: Blogger '+last,'e'); return null;};
-  window.updateExistingPost=async function(ev,title,html,status,labels,publishDate=null){const pl=ev?getLog(ev):null,id=editingPostId||pl?.postId;if(!id){toast('No post ID to update','e');return null}const body={kind:'blogger#post',id,blog:{id:CFG.blogId},title,content:html,labels:labels||[],searchDescription:(v('post-search-description')||makeSearchDescription(title,html)).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})};let r,last;for(let attempt=0;attempt<4;attempt++){try{r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+id,{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.ok){const p=await r.json();if(ev)setLog(ev,{postId:p.id,postUrl:p.url,status,title,league:ev.league?.name});toast('Post updated ✓','s');return p}last=r.status;if(![429,500,502,503,504].includes(r.status))break;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}}toast('Update failed after retries: Blogger '+last,'e');return null;};
+  window.postRaw=async function(title,html,status,labels,publishDate=null){if(!CFG.blogId||!accessToken)return null;let url='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+(status==='LIVE'?'':'?isDraft=true');let r,last; for(let attempt=0;attempt<4;attempt++){try{r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({kind:'blogger#post',blog:{id:CFG.blogId},title,content:html,labels:labels||['Sports 803'],searchDescription:(ensureSearchDescription(title,html)||makeSearchDescription(title,html)).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})})}); if(r.ok)return r.json(); last=r.status; if(![429,500,502,503,504].includes(r.status))break; await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}} toast('Post failed after retries: Blogger '+last,'e'); return null;};
+  window.updateExistingPost=async function(ev,title,html,status,labels,publishDate=null){const pl=ev?getLog(ev):null,id=editingPostId||pl?.postId;if(!id){toast('No post ID to update','e');return null}const body={kind:'blogger#post',id,blog:{id:CFG.blogId},title,content:html,labels:labels||[],searchDescription:(ensureSearchDescription(title,html)||makeSearchDescription(title,html)).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})};let r,last;for(let attempt=0;attempt<4;attempt++){try{r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+id,{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.ok){const p=await r.json();if(ev)setLog(ev,{postId:p.id,postUrl:p.url,status,title,league:ev.league?.name});toast('Post updated ✓','s');return p}last=r.status;if(![429,500,502,503,504].includes(r.status))break;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}}toast('Update failed after retries: Blogger '+last,'e');return null;};
   // Preserve the v9 search implementation under a private alias, then add canonical persistence.
   const originalSearch=searchOneBallHighlights;
   window.searchOneBallHighlights=async function(ev){const r=await originalSearch(ev);if(r){const replayUrl=r.replayUrl||r.replayPageUrl||'';setLog(ev,{hasHL:true,hlUrl:r.playerUrl,replayUrl,oneMatchId:extractReplayId(replayUrl),hlCanonical:replayUrl.split('?')[0],hlFetchedAt:Date.now()});}return r;};
@@ -5504,13 +5540,13 @@ document.addEventListener('DOMContentLoaded', () => {
   window.updateHLResolution=async function(){const el=document.getElementById('hl-manual-post-url'),out=document.getElementById('hl-resolution'),warn=document.getElementById('hl-override-warning');if(!el||!out)return;const raw=el.value.trim(),ev=allEvents[parseInt(v('hl-select'))],pl=ev?getLog(ev):null;if(!raw){out.style.display='none';warn.style.display='none';updateHLPostButton();return}const id=await resolvePostUrlToId(raw);if(!id){out.style.display='block';out.textContent='Could not resolve this URL — check the post still exists.';out.style.color='var(--red)';updateHLPostButton();return}out.style.display='flex';out.style.color='var(--text)';out.innerHTML='Will update: postId '+id+' · Source: '+(pl?.postId&&String(pl.postId)===String(id)?'log':'manual URL')+' <a href="'+raw+'" target="_blank" style="color:var(--blue)">View on Blogger ↗</a>';warn.style.display=pl?.postId&&String(pl.postId)!==String(id)?'flex':'none';updateHLPostButton();};
   window.updateHLPostButton=function(){const b=document.getElementById('hl-post-button'),raw=v('hl-manual-post-url'),out=document.getElementById('hl-resolution'),c=document.getElementById('hl-override-confirm');if(b)b.disabled=!!raw&&(!out||out.textContent.startsWith('Could not')||(document.getElementById('hl-override-warning')?.style.display!=='none'&&!c?.checked));};
 window.buildRichHighlightSections=function(ev){const h=ev.home?.name||'Home',a=ev.away?.name||'Away',lg=typeof ev.league==='string'?ev.league:(ev.league?.name||'the competition'),dt=ev.startTime?new Date(ev.startTime).toLocaleString():'the scheduled time';return '<h2>Match Overview</h2><p>'+h+' vs '+a+' was a competitive '+lg+' fixture. This highlights article brings together the match context, the important passages of play, and the replay so readers can understand how the contest developed from kickoff to the final whistle.</p><h2>Match Details</h2><p><strong>Competition:</strong> '+lg+'<br><strong>Fixture:</strong> '+h+' vs '+a+'<br><strong>Scheduled:</strong> '+dt+'</p><h2>Key Moments</h2><p>The decisive moments came from changes in pressure, chances created in the final third, defensive recoveries, and the sequences that changed the scoreline. Watch the replay to see each phase in context rather than relying on a short score-only summary.</p><h2>Standout Contributions</h2><p>Players who carried the ball forward, created openings, defended dangerous situations, or delivered important set pieces shaped the story of this match. The full highlights player below provides the clearest way to review those contributions.</p><h2>What the Result Means</h2><p>This result will influence confidence and preparation for the next round of fixtures. Both teams can use the performance as a reference: one side will want to build on its best spells, while the other will focus on improving the moments that allowed the match to turn.</p><h2>How to Watch</h2><p>Use the embedded Sports 803 player below to watch the replay and revisit the main action. The article is designed to provide useful match context alongside the video rather than offering only a thin player link.</p>';};
-  window.postHighlights=async function(){const ev=allEvents[parseInt(v('hl-select'))];if(!ev)return;const body=v('hl-body'),manual=v('hl-manual-post-url');if(!body){toast('Write/generate text first','i');return}if(manual){const id=await resolvePostUrlToId(manual);if(!id){toast('Could not resolve this URL — check the post still exists.','e');return}const pl=getLog(ev);if(pl?.postId&&String(pl.postId)!==String(id)&&!document.getElementById('hl-override-confirm')?.checked){toast('Confirm the manual override first','w');return}setLog(ev,{postId:id,postUrl:manual});}const pl=getLog(ev),video=v('hl-video'),canonical=video.split('?')[0],thumb=v('hl-thumb-url');let enrichedBody=body;if(!/Match Overview|Match Details/i.test(enrichedBody)||enrichedBody.trim().split(/\s+/).length<350)enrichedBody=enrichedBody+'\n\n'+buildRichHighlightSections(ev);let html='';if(thumb)html+='<div id="s803-hl-thumb" data-canonical="'+canonical+'"><img src="'+thumb+'" style="max-width:100%;height:auto;border-radius:10px;margin-bottom:18px"></div>\n';html+=stripInjectedBlocks(enrichedBody).replace(/<div id="s803-hl-thumb"[\s\S]*?<\/div>/gi,'');if(video)html+='\n\n'+buildHighlightsPlayerIframe(video);const title=(ev.home?.name||ev.name)+' vs '+(ev.away?.name||'')+' – Highlights & Replay | Sports 803',status=v('hl-post-status')||'LIVE',p=pl?.postId?await updateExistingPost(ev,title,html,status,getLabels(ev)):await postRaw(title,html,status,getLabels(ev));if(p){setLog(ev,{postId:p.id,postUrl:p.url,title,hasHL:true,status,thumb:thumb||pl?.thumb||null});toast(status==='LIVE'?'Highlights published ✓':'Highlights saved as draft ✓','s');closeModal('modal-hl');renderEventCards(allEvents);}};
+  window.postHighlights=async function(){const ev=allEvents[parseInt(v('hl-select'))];if(!ev)return;const body=v('hl-body'),manual=v('hl-manual-post-url');if(!body){toast('Write/generate text first','i');return}if(manual){const id=await resolvePostUrlToId(manual);if(!id){toast('Could not resolve this URL — check the post still exists.','e');return}const pl=getLog(ev);if(pl?.postId&&String(pl.postId)!==String(id)&&!document.getElementById('hl-override-confirm')?.checked){toast('Confirm the manual override first','w');return}setLog(ev,{postId:id,postUrl:manual});}const pl=getLog(ev),video=v('hl-video'),canonical=canonicalOneBallReplayUrl(video.split('?')[0]),thumb=v('hl-thumb-url'); ensureSearchDescription((ev.home?.name||ev.name)+' vs '+(ev.away?.name||'')+' Highlights & Replay | Sports 803',body);let enrichedBody=body;if(!/Match Overview|Match Details/i.test(enrichedBody)||enrichedBody.trim().split(/\s+/).length<350)enrichedBody=enrichedBody+'\n\n'+buildRichHighlightSections(ev);let html='';if(thumb)html+='<div id="s803-hl-thumb" data-canonical="'+canonical+'"><img src="'+thumb+'" style="max-width:100%;height:auto;border-radius:10px;margin-bottom:18px"></div>\n';html+=stripInjectedBlocks(enrichedBody).replace(/<div id="s803-hl-thumb"[\s\S]*?<\/div>/gi,'');if(video)html+='\n\n'+buildHighlightsPlayerIframe(video);const title=(ev.home?.name||ev.name)+' vs '+(ev.away?.name||'')+' – Highlights & Replay | Sports 803',status=v('hl-post-status')||'LIVE',p=pl?.postId?await updateExistingPost(ev,title,html,status,getLabels(ev)):await postRaw(title,html,status,getLabels(ev));if(p){setLog(ev,{postId:p.id,postUrl:p.url,title,hasHL:true,status,thumb:thumb||pl?.thumb||null});toast(status==='LIVE'?'Highlights published ✓':'Highlights saved as draft ✓','s');closeModal('modal-hl');renderEventCards(allEvents);}};
   window.checkHighlights=function(){const fin=allEvents.filter(e=>STATUS.isFinal(e.status));if(!fin.length){toast('No finished events found. Fetch today\'s events first.','w');return}populateHLSelect();const e=fin.find(x=>!getLog(x)?.hasHL)||fin[0];document.getElementById('hl-select').value=allEvents.indexOf(e);onHLSelect();openModal('modal-hl');};
   // Storage migration runs after the original loader has restored config and caches.
   oldLoadAll();
   const raw=localStorage.getItem(SK_POST);try{const j=JSON.parse(raw||'{}');postLog=migratePostLog(j.data||j);if(!j.schema||j.schema!==2)saveV10();}catch(e){postLog={};}prunePostLog();
   window.renderPostLog=function(){const tb=document.getElementById('log-tbody');if(!tb)return;const es=logEntries().map(x=>x[1]).sort((a,b)=>(b.ts||0)-(a.ts||0));tb.innerHTML=es.length?es.map(p=>'<tr><td>'+ (p.title||'—')+'</td><td><button class="btn-ghost btn-xs" onclick="navigator.clipboard.writeText(\''+(p.postId||'')+'\')">'+(p.postId||'—')+'</button></td><td>'+(p.league||'—')+'</td><td>'+(p.thumb?'🖼️ Yes':'—')+'</td><td>'+(p.status||'draft')+'</td><td>'+(p.hasHL?'✓':'—')+'</td><td>'+(p.ts?new Date(p.ts).toLocaleString():'—')+'</td><td>'+(p.postUrl?'<a href="'+p.postUrl+'" target="_blank">View</a>':'—')+'</td></tr>').join(''):'<tr><td colspan="8">No posts yet.</td></tr>';};
-  window.syncPostLogFromBlogger=async function(){if(!accessToken||!CFG.blogId){toast('Sign in and set Blog ID first','w');return}try{const r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts?labels=s803&maxResults=500&fetchBodies=false',{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();(d.items||[]).forEach(p=>{const lab=(p.labels||[]).find(x=>x.indexOf('s803:')===0);if(!lab)return;const k=lab.slice(5);postLog[k]={...(postLog[k]||{}),postId:p.id,postUrl:p.url,title:p.title,status:p.status,bloggerSyncedAt:Date.now(),ts:postLog[k]?.ts||Date.now()};});saveV10();renderPostLog();renderPostLogDiagnostics();updateStats();toast('Synced '+(d.items||[]).length+' Blogger posts ✓','s')}catch(e){toast('Blogger sync failed: '+e.message,'e')}};
+  window.syncPostLogFromBlogger=async function(){if(!accessToken||!CFG.blogId){toast('Sign in and set Blog ID first','w');return}try{let pageToken='',items=[];do{const q='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts?maxResults=500&fetchBodies=false'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');const r=await fetch(q,{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();items.push(...(d.items||[]));pageToken=d.nextPageToken||'';}while(pageToken);let synced=0;items.forEach(p=>{const labels=p.labels||[];const markers=labels.filter(x=>x.indexOf('s803:')===0);if(!markers.length){const title=String(p.title||'').toLowerCase();const match=allEvents.find(ev=>{const a=(ev.home?.name||ev.name||'').toLowerCase(),b=(ev.away?.name||'').toLowerCase();return a&&title.includes(a)&&(b?title.includes(b):true)});if(match)markers.push('s803:'+evKey(match));}markers.forEach(marker=>{const k=marker.slice(5);if(!k||k==='hl')return;postLog[k]={...(postLog[k]||{}),postId:p.id,postUrl:p.url,title:p.title,status:p.status,searchDescription:p.searchDescription||postLog[k]?.searchDescription||'',bloggerSyncedAt:Date.now(),ts:postLog[k]?.ts||Date.now()};synced++;});});saveV10();renderPostLog();renderPostLogDiagnostics();updateStats();toast('Synced '+synced+' Sports 803 post IDs/URLs from Blogger ✓','s')}catch(e){toast('Blogger sync failed: '+e.message,'e')}};
   window.renderPostLogDiagnostics=function(){const el=document.getElementById('post-log-diagnostics-body');if(!el)return;const es=logEntries();const ids={};es.forEach(([k,v])=>{if(v.postId)(ids[v.postId]??=[]).push(k)});const dup=Object.entries(ids).filter(([,ks])=>ks.length>1).map(([id])=>id);el.innerHTML='Total entries: '+es.length+' · with postId: '+es.filter(([,v])=>v.postId).length+' · hasHL: '+es.filter(([,v])=>v.hasHL).length+' · duplicate postIds: '+(dup.join(', ')||'none')+' · orphaned race keys: '+es.filter(([k])=>k.startsWith('race_')).length;};
   window.repairPostLog=function(){postLog=migratePostLog(postLog);prunePostLog();saveV10();renderPostLog();renderPostLogDiagnostics();toast('Post log repaired ✓','s');};
   // Rebind manual URL preview without changing existing UI.
