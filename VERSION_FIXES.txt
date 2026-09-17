@@ -1,0 +1,9 @@
+Truepost fixes applied locally 2026-09-17
+- Highlights URLs without encodeURIComponent
+- Default templates seeded
+- Search description ~150 chars
+- Per-event drafts + restore prompt
+- saveCurrentAsTemplate defined
+- Stable evKey with event id
+- Race objects have type
+- fetch/logo/cache/sched/bulk retries
