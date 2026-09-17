@@ -2224,7 +2224,12 @@ let draftAutoSaveTimer = null;
 // ----- HELPERS -----
 function v(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
 function set(id, val) { const el = document.getElementById(id); if (el) el.value = val || ''; }
-function evKey(ev) { const dt = ev?.startTime ? new Date(ev.startTime).toISOString().slice(0,10) : (ev?.date || 'undated'); return [ev?.type || 'match', ev?.id || 'no-id', ev?.league?.id || '', dt, (ev?.home?.name || ev?.name || '').trim(), (ev?.away?.name || '').trim()].join('|'); }
+function evKey(ev) {
+  let dt = 'undated';
+  if (ev?.startTime) { const t = new Date(ev.startTime); if (!isNaN(t.getTime())) dt = t.toISOString().slice(0, 10); }
+  else if (ev?.date) dt = String(ev.date).slice(0, 10);
+  return [ev?.type || 'match', ev?.id || 'no-id', ev?.league?.id || '', dt, (ev?.home?.name || ev?.name || '').trim(), (ev?.away?.name || '').trim()].join('|');
+}
 function getLog(ev) { return postLog[evKey(ev)] || null; }
 function setLog(ev, data) { postLog[evKey(ev)] = { ...(postLog[evKey(ev)] || {}), ...data, ts: Date.now() }; saveAll(); updateStats(); }
 function findEv(sid) { const id = decodeURIComponent(String(sid)); return allEvents.find(e => String(e.id) === id) || allEvents.find(e => String(e.id) === String(sid)) || null; }
@@ -3098,7 +3103,11 @@ function parseESPN(ev, league) {
   const comp = ev.competitions?.[0] || {};
   const comps = comp.competitors || [];
   const status = ev.status?.type?.description || 'Scheduled';
-  const startTime = ev.date ? new Date(ev.date) : null;
+  let startTime = null;
+  if (ev.date) {
+    const parsedTime = new Date(ev.date);
+    if (!isNaN(parsedTime.getTime())) startTime = parsedTime;
+  }
   if (league.type === 'race') {
     return {
       id: ev.id, league, type: 'race',
@@ -3722,45 +3731,59 @@ function filterEvents() {
 
 function renderEventCards(events) {
   const grid = document.getElementById('events-grid');
-  const filtered = activeFilter === 'all' ? events : events.filter(e => e.league.id === activeFilter);
-  if (!filtered.length) { grid.innerHTML = '<div style="color:var(--muted2);grid-column:1/-1;padding:40px;text-align:center;opacity:.5">No events found.</div>'; return; }
-  grid.innerHTML = filtered.map(ev => ev.type === 'race' ? renderRaceCard(ev) : renderMatchCard(ev)).join('');
+  if (!grid) return;
+  const filtered = activeFilter === 'all' ? events : events.filter(e => e.league?.id === activeFilter);
+  if (!filtered.length) { grid.innerHTML = '<div style=\"color:var(--muted2);grid-column:1/-1;padding:40px;text-align:center;opacity:.5\">No events found.</div>'; return; }
+  const html = filtered.map(ev => {
+    try { return ev.type === 'race' ? renderRaceCard(ev) : renderMatchCard(ev); }
+    catch (err) { console.error('[renderEventCards] failed for event:', ev, err); return ''; }
+  }).join('');
+  grid.innerHTML = html || '<div style=\"color:var(--muted2);grid-column:1/-1;padding:40px;text-align:center;opacity:.5\">Events could not be rendered.</div>';
 }
 
 function renderMatchCard(ev) {
-  const ts = ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD';
-  const sc = window.STATUS.badgeClass(ev.status);
+  const hName = String(ev.home?.name || 'TBD').trim();
+  const aName = String(ev.away?.name || 'TBD').trim();
+  const league = ev.league || {};
+  const leagueName = league.name || 'Event';
+  const leagueIcon = league.icon || '⚽';
+  const ts = ev.startTime && !isNaN(new Date(ev.startTime).getTime()) ? new Date(ev.startTime).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD';
+  const sc = window.STATUS.badgeClass(ev.status || 'Scheduled');
   const pl = getLog(ev);
-  const sid = encodeURIComponent(String(ev.id));
-  const badge = pl ? '<span class="post-badge ' + (pl.status || 'draft').toLowerCase() + '">' + (pl.status || 'draft') + '</span>' : '';
-  const thumbBadge = pl?.thumb ? '<span class="thumb-badge">🖼️ Thumb</span>' : '';
-  const hLogo = ev.home.logo || LOGO_CACHE[ev.home.name.toLowerCase()] || '';
-  const aLogo = ev.away.logo || LOGO_CACHE[ev.away.name.toLowerCase()] || '';
-  const hChip = hLogo ? '<div class="logo-chip"><img src="' + wsrv(hLogo, 80) + '" onerror="this.parentElement.textContent=\'' + ev.home.name[0] + '\'" alt="' + ev.home.name + '" style="width:100%;height:100%;object-fit:contain"></div>' : '<div class="logo-chip">' + ev.home.name[0] + '</div>';
-  const aChip = aLogo ? '<div class="logo-chip"><img src="' + wsrv(aLogo, 80) + '" onerror="this.parentElement.textContent=\'' + ev.away.name[0] + '\'" alt="' + ev.away.name + '" style="width:100%;height:100%;object-fit:contain"></div>' : '<div class="logo-chip">' + ev.away.name[0] + '</div>';
-  return '<div class="event-card ' + (pl?.thumb ? 'has-thumb' : '') + ' ' + (pl?.postId ? 'posted' : '') + '" data-id="' + ev.id + '">' +
-    '<div class="ec-top"><span class="ec-league">' + ev.league.icon + ' ' + ev.league.name + '</span><div style="display:flex;align-items:center;gap:4px">' + thumbBadge + badge + '<span class="ec-status ' + sc + '">' + ev.status + '</span></div></div>' +
-    '<div class="ec-match"><div class="ec-team">' + hChip + '<div class="ec-team-name">' + ev.home.name + '</div></div>' +
-    '<div style="display:flex;flex-direction:column;align-items:center"><div class="ec-vs">' + (ev.home.score !== '' ? ev.home.score + ' – ' + ev.away.score : 'vs') + '</div><div class="ec-time">' + ts + '</div></div>' +
-    '<div class="ec-team">' + aChip + '<div class="ec-team-name">' + ev.away.name + '</div></div></div>' +
-    (pl?.postUrl ? '<div style="font-size:.62rem;color:var(--muted2)">📝 <a href="' + pl.postUrl + '" target="_blank" style="color:var(--blue)">View post</a></div>' : '') +
-    '<div class="ec-actions"><button class="btn-red btn-sm" onclick="genAndFill(\'' + sid + '\')">✍️ Gen</button><button class="btn-blue btn-sm" onclick="quickPostEv(\'' + sid + '\')">📤 Post</button><button class="btn-gold btn-sm" onclick="genThumbForEv(\'' + sid + '\')">🖼️ Thumb</button><button class="btn-orange btn-sm" onclick="openHLForEv(\'' + sid + '\')">🎬 HL</button><button class="btn-blue btn-sm" onclick="postHLForEv(\'' + sid + '\')">📤 Post HL</button></div></div>';
+  const sid = encodeURIComponent(String(ev.id || ''));
+  const badge = pl ? '<span class=\"post-badge ' + (pl.status || 'draft').toLowerCase() + '\">' + (pl.status || 'draft') + '</span>' : '';
+  const thumbBadge = pl?.thumb ? '<span class=\"thumb-badge\">🖼️ Thumb</span>' : '';
+  const hLogo = ev.home?.logo || (hName && LOGO_CACHE[hName.toLowerCase()]) || '';
+  const aLogo = ev.away?.logo || (aName && LOGO_CACHE[aName.toLowerCase()]) || '';
+  const hInitial = (hName[0] || '?').toUpperCase();
+  const aInitial = (aName[0] || '?').toUpperCase();
+  const hChip = hLogo ? '<div class=\"logo-chip\"><img src=\"' + wsrv(hLogo, 80) + '\" onerror=\"this.parentElement.textContent=\'' + hInitial + '\'\" alt=\"' + hName + '\" style=\"width:100%;height:100%;object-fit:contain\"></div>' : '<div class=\"logo-chip\">' + hInitial + '</div>';
+  const aChip = aLogo ? '<div class=\"logo-chip\"><img src=\"' + wsrv(aLogo, 80) + '\" onerror=\"this.parentElement.textContent=\'' + aInitial + '\'\" alt=\"' + aName + '\" style=\"width:100%;height:100%;object-fit:contain\"></div>' : '<div class=\"logo-chip\">' + aInitial + '</div>';
+  return '<div class=\"event-card ' + (pl?.thumb ? 'has-thumb' : '') + ' ' + (pl?.postId ? 'posted' : '') + '\" data-id=\"' + (ev.id || '') + '\">' +
+    '<div class=\"ec-top\"><span class=\"ec-league\">' + leagueIcon + ' ' + leagueName + '</span><div style=\"display:flex;align-items:center;gap:4px\">' + thumbBadge + badge + '<span class=\"ec-status ' + sc + '\">' + (ev.status || 'Scheduled') + '</span></div></div>' +
+    '<div class=\"ec-match\"><div class=\"ec-team\">' + hChip + '<div class=\"ec-team-name\">' + hName + '</div></div>' +
+    '<div style=\"display:flex;flex-direction:column;align-items:center\"><div class=\"ec-vs\">' + (ev.home?.score !== '' && ev.home?.score != null ? ev.home.score + ' – ' + (ev.away?.score ?? '') : 'vs') + '</div><div class=\"ec-time\">' + ts + '</div></div>' +
+    '<div class=\"ec-team\">' + aChip + '<div class=\"ec-team-name\">' + aName + '</div></div></div>' +
+    (pl?.postUrl ? '<div style=\"font-size:.62rem;color:var(--muted2)\">📝 <a href=\"' + pl.postUrl + '\" target=\"_blank\" style=\"color:var(--blue)\">View post</a></div>' : '') +
+    '<div class=\"ec-actions\"><button class=\"btn-red btn-sm\" onclick=\"genAndFill(\'' + sid + '\')\">✍️ Gen</button><button class=\"btn-blue btn-sm\" onclick=\"quickPostEv(\'' + sid + '\')\">📤 Post</button><button class=\"btn-gold btn-sm\" onclick=\"genThumbForEv(\'' + sid + '\')\">🖼️ Thumb</button><button class=\"btn-orange btn-sm\" onclick=\"openHLForEv(\'' + sid + '\')\">🎬 HL</button><button class=\"btn-blue btn-sm\" onclick=\"postHLForEv(\'' + sid + '\')\">📤 Post HL</button></div></div>';
 }
 
 function renderRaceCard(ev) {
-  const ts = ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD';
-  const sc = window.STATUS.badgeClass(ev.status);
+  const league = ev.league || {};
+  const ts = ev.startTime && !isNaN(new Date(ev.startTime).getTime()) ? new Date(ev.startTime).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD';
+  const sc = window.STATUS.badgeClass(ev.status || 'Scheduled');
   const pl = getLog(ev);
-  const sid = encodeURIComponent(String(ev.id));
-  const badge = pl ? '<span class="post-badge ' + (pl.status || 'draft').toLowerCase() + '">' + (pl.status || 'draft') + '</span>' : '';
-  const thumbBadge = pl?.thumb ? '<span class="thumb-badge">🖼️ Thumb</span>' : '';
-  return '<div class="event-card ' + (pl?.thumb ? 'has-thumb' : '') + ' ' + (pl?.postId ? 'posted' : '') + '" data-id="' + ev.id + '">' +
-    '<div class="ec-top"><span class="ec-league">' + ev.league.icon + ' ' + ev.league.name + '</span><div style="display:flex;gap:4px">' + thumbBadge + badge + '<span class="ec-status ' + sc + '">' + ev.status + '</span></div></div>' +
-    '<div style="font-family:var(--cond);font-size:.92rem;font-weight:800;text-transform:uppercase">' + ev.name + '</div>' +
-    (ev.venue ? '<div style="font-size:.68rem;color:var(--muted2)">🏟 ' + ev.venue + (ev.location ? ', ' + ev.location : '') + '</div>' : '') +
-    '<div class="ec-time">🕐 ' + ts + '</div>' +
-    (pl?.postUrl ? '<div style="font-size:.62rem;color:var(--muted2)">📝 <a href="' + pl.postUrl + '" target="_blank" style="color:var(--blue)">View</a></div>' : '') +
-    '<div class="ec-actions"><button class="btn-red btn-sm" onclick="genAndFill(\'' + sid + '\')">✍️ Gen</button><button class="btn-blue btn-sm" onclick="quickPostEv(\'' + sid + '\')">📤 Post</button><button class="btn-gold btn-sm" onclick="genThumbForEv(\'' + sid + '\')">🖼️ Thumb</button></div></div>';
+  const sid = encodeURIComponent(String(ev.id || ''));
+  const name = String(ev.name || 'Race/Event').trim();
+  const badge = pl ? '<span class=\"post-badge ' + (pl.status || 'draft').toLowerCase() + '\">' + (pl.status || 'draft') + '</span>' : '';
+  const thumbBadge = pl?.thumb ? '<span class=\"thumb-badge\">🖼️ Thumb</span>' : '';
+  return '<div class=\"event-card ' + (pl?.thumb ? 'has-thumb' : '') + ' ' + (pl?.postId ? 'posted' : '') + '\" data-id=\"' + (ev.id || '') + '\">' +
+    '<div class=\"ec-top\"><span class=\"ec-league\">' + (league.icon || '🏁') + ' ' + (league.name || 'Event') + '</span><div style=\"display:flex;gap:4px\">' + thumbBadge + badge + '<span class=\"ec-status ' + sc + '\">' + (ev.status || 'Scheduled') + '</span></div></div>' +
+    '<div style=\"font-family:var(--cond);font-size:.92rem;font-weight:800;text-transform:uppercase\">' + name + '</div>' +
+    (ev.venue ? '<div style=\"font-size:.68rem;color:var(--muted2)\">🏟 ' + ev.venue + (ev.location ? ', ' + ev.location : '') + '</div>' : '') +
+    '<div class=\"ec-time\">🕐 ' + ts + '</div>' +
+    (pl?.postUrl ? '<div style=\"font-size:.62rem;color:var(--muted2)\">📝 <a href=\"' + pl.postUrl + '\" target=\"_blank\" style=\"color:var(--blue)\">View</a></div>' : '') +
+    '<div class=\"ec-actions\"><button class=\"btn-red btn-sm\" onclick=\"genAndFill(\'' + sid + '\')\">✍️ Gen</button><button class=\"btn-blue btn-sm\" onclick=\"quickPostEv(\'' + sid + '\')\">📤 Post</button><button class=\"btn-gold btn-sm\" onclick=\"genThumbForEv(\'' + sid + '\')\">🖼️ Thumb</button></div></div>';
 }
 
 function getRaceImg(ev) {
@@ -5644,7 +5667,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const oldLoadAll = loadAll;
   function isEntry(k,v) { return k && v && typeof v === 'object' && !k.startsWith('__'); }
   function canonTeam(name) { return String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(fc|afc|rfc|sc|cf|ac|as|bsc|rcd|rc|vfb|vfl|1\.fc|club|clube|deportivo|athletic|hotspur)\b/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim(); }
-  function evKey(ev) { if (!ev) return 'unknown'; const dt=ev.startTime?new Date(ev.startTime).toISOString().slice(0,10):(ev.date||'undated'); return [ev.type||'match',ev.id||'no-id',ev.league?.id||'x',dt,canonTeam(ev.home?.name||ev.name),canonTeam(ev.away?.name)].join('|'); }
+  function evKey(ev) {
+    if (!ev) return 'unknown';
+    let dt = 'undated';
+    if (ev.startTime) { const t = new Date(ev.startTime); if (!isNaN(t.getTime())) dt = t.toISOString().slice(0, 10); }
+    else if (ev.date) dt = String(ev.date).slice(0, 10);
+    return [ev.type || 'match', ev.id || 'no-id', ev.league?.id || 'x', dt, canonTeam(ev.home?.name || ev.name), canonTeam(ev.away?.name)].join('|');
+  }
   function logEntries() { return Object.entries(postLog).filter(([k,v])=>isEntry(k,v)); }
   function migratePostLog(input) { const out={...input}; Object.keys(input||{}).forEach(k=>{ if(k.startsWith('race_')) { const v=input[k]; const nk='race|'+canonTeam(v.name||v.title||k.slice(5)); if(!out[nk]) out[nk]={...v}; if(nk!==k) out[nk].migratedFrom=k; } }); Object.keys(out).filter(k=>k.startsWith('race_')).forEach(k=>{ if(out[k]?.postId) out[k].orphanedRaceKey=true; }); return out; }
   function prunePostLog() { const cutoff=Date.now()-180*86400000; const entries=logEntries().sort((a,b)=>(b[1].ts||0)-(a[1].ts||0)).slice(0,500); const keep={}; entries.forEach(([k,v])=>{if(v.postId || (v.ts||0)>=cutoff) keep[k]=v;}); Object.keys(postLog).filter(k=>k.startsWith('__')).forEach(k=>keep[k]=postLog[k]); postLog=keep; }
