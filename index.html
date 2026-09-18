@@ -519,11 +519,11 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
   border: 1px solid rgba(6,214,160,.2);
 }
 .ec-status.sched {
+.ec-status.dead { background: rgba(122,142,168,.22); color: var(--muted2); text-decoration: line-through; }
   background: rgba(76,201,240,.08);
   color: var(--blue);
   border: 1px solid rgba(76,201,240,.18);
 }
-.ec-status.dead { background: rgba(122,142,168,.22); color: var(--muted2); text-decoration: line-through; }
 .ec-match {
   display: flex;
   align-items: center;
@@ -1950,7 +1950,7 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
         <div>
           <label>Claude Model</label>
           <select id="cfg-deepseek-model" onchange="saveCFG()">
-            <option value="claude-sonnet-5">Claude Sonnet 5 (best quality)</option>
+            <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (best quality)</option>
             <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fast &amp; cheap)</option>
           </select>
         </div>
@@ -2038,16 +2038,11 @@ button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; 
     <div class="card">
       <div class="card-title">Data Management</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-blue btn-sm" onclick="syncPostLogFromBlogger()">↻ Sync from Blogger</button>
-        <button class="btn-ghost btn-sm" onclick="exportCFG()">📤 Export Config</button>
+<div id="post-log-diagnostics" class="card" style="margin-top:12px"><div class="card-title">Post Log Diagnostics</div><div id="post-log-diagnostics-body" style="font-size:.75rem;color:var(--muted2)">Loading…</div><button class="btn-ghost btn-sm" onclick="repairPostLog()" style="margin-top:8px">Repair log</button></div>
+        <button class="btn-blue btn-sm" onclick="syncPostLogFromBlogger()">↻ Sync from Blogger</button> <button class="btn-ghost btn-sm" onclick="exportCFG()">📤 Export Config</button>
         <button class="btn-ghost btn-sm" onclick="importCFG()">📥 Import Config</button>
         <button class="btn-sm" style="background:#3d0c0c;color:#fff" onclick="clearAll()">🗑 Clear All</button>
       </div>
-    </div>
-    <div id="post-log-diagnostics" class="card" style="margin-top:12px">
-      <div class="card-title">Post Log Diagnostics</div>
-      <div id="post-log-diagnostics-body" style="font-size:.75rem;color:var(--muted2)">Loading…</div>
-      <button class="btn-ghost btn-sm" onclick="repairPostLog()" style="margin-top:8px">Repair log</button>
     </div>
   </div>
 </div>
@@ -2190,7 +2185,7 @@ const EVENT_FIREBASE_CHANNELS_PATH = 'livetv/channels';
 // ----- STATE -----
 let CFG = {
   blogId: '', clientId: EVENT_BUILTIN_CLIENT_ID, imgbbKey: '', playerBase: 'https://sports803.github.io/player/', Url: '', Username: '',
-  activeLeagues: [],
+  activeLeagues: ['ucl', 'epl', 'laliga', 'seriea', 'bundesliga', 'f1', 'nba', 'ufc'],
   schedTiming: 60, schedStatus: 'DRAFT', schedInterval: 300000,
   schedEnabled: false, schedThumbs: true, logoOverridesRaw: '',
   mediaPlayerBase: 'https://sports803.github.io/player/',
@@ -2200,7 +2195,7 @@ let CFG = {
   firebaseChannelsPath: EVENT_FIREBASE_CHANNELS_PATH,
   autoFetchStreams: false, enableDdkanqu: false, enableOneTV: false, enablePPVTV: true, embedStreamsInPost: true,
   ddkanquMappingsRaw: '',
-  deepseekKey: '', deepseekModel: 'claude-sonnet-5', deepseekTone: '', deepseekLength: 'medium',
+  deepseekKey: '', deepseekModel: 'claude-sonnet-4-20250514', deepseekTone: '', deepseekLength: 'medium',
   ytApiKey: ''
 };
 let LOGO_OVERRIDES = {}, LOGO_CACHE = {};
@@ -2211,13 +2206,11 @@ let editingPostId = null, editingEventKey = null;
 let schedTimer = null, schedNextFire = null;
 let tbDebounce, composDebounce;
 let currentComposeEv = null;
-let currentSEOEvent = null;
 let currentComposeRace = null;
 let fullRacesData = [];
 let tbGenCount = 0, composeGenCount = 0;
 let externalStreamsMap = {}, ddkanquCache = {}, ddkanquMappings = {}, ddkanquHomeMap = {}, oneTVHomeMap = {}, ppvTVHomeMap = {};
 let dsArticleCache = {};
-let dsArticleCacheOrder = [];
 let templates = {};
 let draftAutoSaveTimer = null;
 
@@ -2266,8 +2259,6 @@ function migrateRemoveLegacyConfig() {
 function loadAll() {
   migrateRemoveLegacyConfig();
   try { const p = JSON.parse(localStorage.getItem(SK_CFG) || '{}'); if (p.data) CFG = { ...CFG, ...p.data }; } catch(e) {}
-  // Keep existing user settings, but activate every registered league so newly added leagues are available immediately.
-  CFG.activeLeagues = [...new Set(LEAGUES.map(l => l.id))];
   try { const p = JSON.parse(localStorage.getItem(SK_CH) || '{}'); channels = p.data?.length ? p.data : DEFAULT_CHANNELS; } catch(e) { channels = [...DEFAULT_CHANNELS]; }
   try { const p = JSON.parse(localStorage.getItem(SK_POST) || '{}'); if (p.data) postLog = p.data; } catch(e) {}
   try { const p = JSON.parse(localStorage.getItem(SK_LOGO) || '{}'); if (p.data) LOGO_CACHE = p.data; } catch(e) {}
@@ -2277,7 +2268,6 @@ function loadAll() {
   LOGO_OVERRIDES = parseLOOverrides(CFG.logoOverridesRaw);
   ddkanquMappings = parseDDKMappings(CFG.ddkanquMappingsRaw);
   if (!CFG.clientId || CFG.clientId === LEGACY_EVENT_CLIENT_ID) CFG.clientId = EVENT_BUILTIN_CLIENT_ID;
-  if (CFG.deepseekModel === 'claude-sonnet-4-20250514') CFG.deepseekModel = 'claude-sonnet-5';
   CFG.firebaseDatabaseUrl = CFG.firebaseDatabaseUrl || EVENT_FIREBASE_DATABASE_URL;
   CFG.firebaseEventsPath = CFG.firebaseEventsPath || EVENT_FIREBASE_EVENTS_PATH;
   CFG.firebaseChannelsPath = CFG.firebaseChannelsPath || EVENT_FIREBASE_CHANNELS_PATH;
@@ -2310,7 +2300,7 @@ function saveCFG() {
   CFG.embedStreamsInPost = document.getElementById('cfg-embed-streams-in-post')?.checked ?? true;
   CFG.ddkanquMappingsRaw = v('cfg-ddkanqu-mappings');
   CFG.deepseekKey = v('cfg-deepseek-key');
-  CFG.deepseekModel = document.getElementById('cfg-deepseek-model')?.value || 'claude-sonnet-5';
+  CFG.deepseekModel = document.getElementById('cfg-deepseek-model')?.value || 'claude-sonnet-4-20250514';
   CFG.deepseekTone = v('cfg-deepseek-tone');
   CFG.deepseekLength = document.getElementById('cfg-deepseek-length')?.value || 'medium';
   ddkanquMappings = parseDDKMappings(CFG.ddkanquMappingsRaw);
@@ -2382,68 +2372,6 @@ const LEAGUES = [
   { id: 'motogp', sport: 'racing', slug: 'motogp', name: 'MotoGP', icon: '🏍️', type: 'race' },
   { id: 'cycling', sport: 'cycling', slug: 'world', name: 'Cycling', icon: '🚴', type: 'race' },
   { id: 'mlb', sport: 'baseball', slug: 'mlb', name: 'MLB', icon: '⚾', type: 'match' },
-  { id: 'afc_cl2', sport: 'soccer', slug: 'afc.cup', name: 'AFC Champions League Two', icon: '🏆', type: 'match' },
-  { id: 'afl', sport: 'football', slug: 'aus.1', name: 'AFL', icon: '🏉', type: 'match' },
-  { id: 'allsvenskan', sport: 'soccer', slug: 'swe.1', name: 'Allsvenskan', icon: '🇸🇪', type: 'match' },
-  { id: 'armenia_pl', sport: 'soccer', slug: 'arm.1', name: 'Armenian Premier League', icon: '🇦🇲', type: 'match' },
-  { id: 'asian_games_m_basketball', sport: 'basketball', slug: 'asiangames.m.basketball', name: "Asian Games - Men's Basketball", icon: '🏀', type: 'match' },
-  { id: 'asian_games_w_basketball', sport: 'basketball', slug: 'asiangames.w.basketball', name: "Asian Games - Women's Basketball", icon: '🏀', type: 'match' },
-  { id: 'azerbaijan_pl', sport: 'soccer', slug: 'aze.1', name: 'Azerbaijan Premier League', icon: '🇦🇿', type: 'match' },
-  { id: 'basketball_cl', sport: 'basketball', slug: 'basketball.champions', name: 'Basketball Champions League', icon: '🏀', type: 'match' },
-  { id: 'belarus_pl', sport: 'soccer', slug: 'blr.1', name: 'Belarusian Premier League', icon: '🇧🇾', type: 'match' },
-  { id: 'belgian_pro', sport: 'soccer', slug: 'bel.1', name: 'Belgian Pro League', icon: '🇧🇪', type: 'match' },
-  { id: 'bolivia_primera', sport: 'soccer', slug: 'bol.1', name: 'Bolivian Primera Division', icon: '🇧🇴', type: 'match' },
-  { id: 'libertadores', sport: 'soccer', slug: 'conmebol.libertadores', name: 'CONMEBOL Copa Libertadores', icon: '🏆', type: 'match' },
-  { id: 'sudamericana', sport: 'soccer', slug: 'conmebol.sudamericana', name: 'CONMEBOL Copa Sudamericana', icon: '🏆', type: 'match' },
-  { id: 'canadian_football', sport: 'football', slug: 'cfl', name: 'Canadian Football', icon: '🏈', type: 'match' },
-  { id: 'colombia_primera', sport: 'soccer', slug: 'col.1', name: 'Categoría Primera A', icon: '🇨🇴', type: 'match' },
-  { id: 'china_l1', sport: 'soccer', slug: 'chn.2', name: 'Chinese Football League 1', icon: '🇨🇳', type: 'match' },
-  { id: 'china_l2', sport: 'soccer', slug: 'chn.3', name: 'Chinese Football League 2', icon: '🇨🇳', type: 'match' },
-  { id: 'china_super', sport: 'soccer', slug: 'chn.1', name: 'Chinese Football Super League', icon: '🇨🇳', type: 'match' },
-  { id: 'college_football', sport: 'football', slug: 'college-football', name: 'College Football', icon: '🏈', type: 'match' },
-  { id: 'egypt_pl', sport: 'soccer', slug: 'egy.1', name: 'Egyptian Premier League', icon: '🇪🇬', type: 'match' },
-  { id: 'efl_cup', sport: 'soccer', slug: 'eng.league_cup', name: 'English Football League Cup', icon: '🏆', type: 'match' },
-  { id: 'efl_one', sport: 'soccer', slug: 'eng.3', name: 'English Football League One', icon: '🏴', type: 'match' },
-  { id: 'estonian_premium', sport: 'soccer', slug: 'est.1', name: 'Estonian Premium Liiga', icon: '🇪🇪', type: 'match' },
-  { id: 'fifa_u20_women', sport: 'soccer', slug: 'fifa.u20.women', name: "FIFA U20 Women's World Cup", icon: '🌍', type: 'match' },
-  { id: 'finland_veikkausliiga', sport: 'soccer', slug: 'fin.1', name: 'Finnish Veikkausliiga', icon: '🇫🇮', type: 'match' },
-  { id: 'india_bangalore', sport: 'soccer', slug: 'ind.bangalore', name: 'Indian Bangalore Super Division', icon: '🇮🇳', type: 'match' },
-  { id: 'indonesia_super', sport: 'soccer', slug: 'idn.1', name: 'Indonesian Super League', icon: '🇮🇩', type: 'match' },
-  { id: 'israel_pl', sport: 'soccer', slug: 'isr.1', name: 'Israel Premier League', icon: '🇮🇱', type: 'match' },
-  { id: 'italy_primavera', sport: 'soccer', slug: 'ita.3', name: 'Italian Campionato Primavera 1', icon: '🇮🇹', type: 'match' },
-  { id: 'japan_j2', sport: 'soccer', slug: 'jpn.2', name: 'Japanese J2 League', icon: '🇯🇵', type: 'match' },
-  { id: 'japan_j3', sport: 'soccer', slug: 'jpn.3', name: 'Japanese J3 League', icon: '🇯🇵', type: 'match' },
-  { id: 'kazakhstan_div1', sport: 'soccer', slug: 'kaz.2', name: 'Kazakhstan Division 1', icon: '🇰🇿', type: 'match' },
-  { id: 'kazakhstan_pl', sport: 'soccer', slug: 'kaz.1', name: 'Kazakhstan Premier League', icon: '🇰🇿', type: 'match' },
-  { id: 'korean_university_basketball', sport: 'basketball', slug: 'kor.university', name: 'Korean University Basketball League', icon: '🏀', type: 'match' },
-  { id: 'liga_mx', sport: 'soccer', slug: 'mex.1', name: 'Liga MX', icon: '🇲🇽', type: 'match' },
-  { id: 'liga_nacional_basketball', sport: 'basketball', slug: 'mex.lnbp', name: 'Liga Nacional de Baloncesto Profesional', icon: '🏀', type: 'match' },
-  { id: 'mex_ascenso', sport: 'soccer', slug: 'mex.2', name: 'Mexico Ascenso MX', icon: '🇲🇽', type: 'match' },
-  { id: 'mongolia_pl', sport: 'soccer', slug: 'mng.1', name: 'Mongolia Premier League', icon: '🇲🇳', type: 'match' },
-  { id: 'oca_asian_games', sport: 'basketball', slug: 'asiangames', name: 'OCA Asian Games', icon: '🌏', type: 'match' },
-  { id: 'oca_womens_asian_games', sport: 'basketball', slug: 'asiangames.women', name: "OCA Women's Asian Games", icon: '🌏', type: 'match' },
-  { id: 'philippines_ncaa', sport: 'basketball', slug: 'ph.ncaa', name: 'Philippines National Collegiate Athletic Association', icon: '🏀', type: 'match' },
-  { id: 'russia_m_league', sport: 'soccer', slug: 'rus.m', name: 'RUS M-League', icon: '🇷🇺', type: 'match' },
-  { id: 'romanian_super', sport: 'soccer', slug: 'rou.1', name: 'Romanian Super Liga', icon: '🇷🇴', type: 'match' },
-  { id: 'nrl', sport: 'football', slug: 'nrl', name: 'Rugby League (NRL)', icon: '🏉', type: 'match' },
-  { id: 'russia_basketball_cup', sport: 'basketball', slug: 'rus.cup', name: 'Russia Basketball Cup', icon: '🏀', type: 'match' },
-  { id: 'russian_first', sport: 'soccer', slug: 'rus.2', name: 'Russian First League', icon: '🇷🇺', type: 'match' },
-  { id: 'russian_pl', sport: 'soccer', slug: 'rus.1', name: 'Russian Premier League', icon: '🇷🇺', type: 'match' },
-  { id: 'serbian_super', sport: 'soccer', slug: 'srb.1', name: 'Serbian Mozzart Bet Superliga', icon: '🇷🇸', type: 'match' },
-  { id: 'singapore_pl', sport: 'soccer', slug: 'sgp.1', name: 'Singapore Premier League', icon: '🇸🇬', type: 'match' },
-  { id: 'thai_league1', sport: 'soccer', slug: 'tha.1', name: 'Thai League 1', icon: '🇹🇭', type: 'match' },
-  { id: 'turkish_cup', sport: 'soccer', slug: 'tur.cup', name: 'Turkish Cup', icon: '🇹🇷', type: 'match' },
-  { id: 'turkish_first', sport: 'soccer', slug: 'tur.2', name: 'Turkish First League', icon: '🇹🇷', type: 'match' },
-  { id: 'ukrainian_cup', sport: 'soccer', slug: 'ukr.cup', name: 'Ukrainian Cup', icon: '🇺🇦', type: 'match' },
-  { id: 'ukrainian_pl', sport: 'soccer', slug: 'ukr.1', name: 'Ukrainian Premier League', icon: '🇺🇦', type: 'match' },
-  { id: 'uzbekistan_pro', sport: 'soccer', slug: 'uzb.2', name: 'Uzbekistan Pro League', icon: '🇺🇿', type: 'match' },
-  { id: 'uzbekistan_super', sport: 'soccer', slug: 'uzb.1', name: 'Uzbekistan Super League', icon: '🇺🇿', type: 'match' },
-  { id: 'wnba', sport: 'basketball', slug: 'wnba', name: "Women's National Basketball Association", icon: '🏀', type: 'match' },
-  { id: 'wrestling', sport: 'wrestling', slug: 'wwe', name: 'Wrestling', icon: '🤼', type: 'match' },
-  { id: 'efl_championship', sport: 'soccer', slug: 'eng.2', name: 'EFL Championship', icon: '🏴', type: 'match' },
-  { id: 'laliga_canonical', sport: 'soccer', slug: 'esp.1', name: 'LaLiga', icon: '🇪🇸', type: 'match' },
-  { id: 'spanish_laliga', sport: 'soccer', slug: 'esp.1', name: 'Spanish La Liga', icon: '🇪🇸', type: 'match' },
-  { id: 'uefa_europa', sport: 'soccer', slug: 'uefa.europa', name: 'UEFA Europa League', icon: '🟠', type: 'match' },
 ];
 
 const DEFAULT_CHANNELS = [
@@ -2597,7 +2525,7 @@ async function testClaude() {
     const r = await fetch(CLAUDE_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-5', max_tokens: 30, messages: [{ role: 'user', content: 'Reply only: "Sports 803 Claude OK"' }] })
+      body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-4-20250514', max_tokens: 30, messages: [{ role: 'user', content: 'Reply only: "Sports 803 Claude OK"' }] })
     });
     const d = await r.json();
     if (d.content?.[0]) { if (res) res.textContent = '✓ Connected: ' + d.content[0].text; toast('Claude AI connected ✓', 's'); }
@@ -2632,7 +2560,7 @@ async function callClaude(prompt) {
   const r = await fetch(CLAUDE_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-5', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ model: CFG.deepseekModel || 'claude-sonnet-4-20250514', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
   });
   if (!r.ok) { const e = await r.text(); throw new Error('Claude API error ' + r.status + ': ' + e); }
   const d = await r.json();
@@ -2733,11 +2661,11 @@ function loadHighlightTemplate(name) {
   const ev = allEvents[parseInt(v('hl-select'))];
   if (name.startsWith('builtin:')) {
     const html = ev && BUILTIN_HIGHLIGHT_TEMPLATES[name.slice(8)] ? BUILTIN_HIGHLIGHT_TEMPLATES[name.slice(8)](ev) : '';
-    if (html) { const old = v('hl-body'); set('hl-body', old ? old + '\n\n' + html : html); toast('Built-in highlight template added', 's'); }
+    if (html) { const old = v('hl-body'); set('hl-body', old ? old + '\\n\\n' + html : html); toast('Built-in highlight template added', 's'); }
     return;
   }
   const t = templates[name];
-  if (t?.body) { const old = v('hl-body'); set('hl-body', old ? old + '\n\n' + t.body : t.body); toast('Highlight template loaded', 's'); }
+  if (t?.body) { const old = v('hl-body'); set('hl-body', old ? old + '\\n\\n' + t.body : t.body); toast('Highlight template loaded', 's'); }
 }
 function renderTemplateList() {
   const el = document.getElementById('template-list');
@@ -2933,21 +2861,6 @@ async function fetchBloggerInfo() {
   }
 }
 
-async function validateStoredSession() {
-  if (!accessToken) return;
-  try {
-    const res = await fetch('https://www.googleapis.com/blogger/v3/users/self/blogs', { headers: { Authorization: 'Bearer ' + accessToken } });
-    if (res.status === 401) { clearBloggerSession(); return; }
-    if (!res.ok) throw new Error('Validation HTTP ' + res.status);
-    updateAuthUI(true);
-    await fetchBloggerInfo();
-  } catch (e) {
-    // Network/offline failures do not invalidate a usable stored session.
-    if (e instanceof TypeError || /network|failed to fetch|offline/i.test(e.message || '')) updateAuthUI(true);
-    else console.warn('[Blogger auth] Session validation:', e.message);
-  }
-}
-
 function refreshBloggerBlogs() {
   if (!accessToken) { toast('Sign in with Google first', 'w'); return; }
   fetchBloggerInfo();
@@ -3009,7 +2922,7 @@ async function postRaw(title, html, status, labels, publishDate = null) {
   let url = 'https://www.googleapis.com/blogger/v3/blogs/' + CFG.blogId + '/posts/';
   const isLive = status === 'LIVE';
   if (!isLive) url += '?isDraft=true';
-  const body = { kind: 'blogger#post', blog: { id: CFG.blogId }, title, content: html, labels: labels || ['sports 803', 'live '], searchDescription: ensureSearchDescription(title, html, currentSEOEvent, true).slice(0,150) };
+  const body = { kind: 'blogger#post', blog: { id: CFG.blogId }, title, content: html, labels: labels || ['sports 803', 'live '], searchDescription: (ensureSearchDescription(title, html) || makeSearchDescription(title, html)).slice(0,150) };
   if (publishDate && isLive) body.published = publishDate;
   try {
     const res = await fetch(url, { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -3027,7 +2940,7 @@ async function updateExistingPost(ev, title, html, status, labels, publishDate =
   const postId = editingPostId || pl?.postId;
   if (!postId) { toast('No post ID to update', 'e'); return null; }
   const isLive = status === 'LIVE';
-  const body = { kind: 'blogger#post', id: postId, blog: { id: CFG.blogId }, title, content: html, labels: labels || ['sports 803', 'live '], searchDescription: ensureSearchDescription(title, html, ev || currentSEOEvent, true).slice(0,150) };
+  const body = { kind: 'blogger#post', id: postId, blog: { id: CFG.blogId }, title, content: html, labels: labels || ['sports 803', 'live '] };
   if (publishDate && isLive) body.published = publishDate;
   let url = 'https://www.googleapis.com/blogger/v3/blogs/' + CFG.blogId + '/posts/' + postId;
   if (!isLive) url += '?publish=false';
@@ -3091,13 +3004,6 @@ async function fetchLeague(league) {
   }
 }
 
-async function loadExternalStreams() {
-  const loaders = [];
-  if (typeof loadDDKanquHome === 'function') loaders.push(loadDDKanquHome());
-  if (typeof loadOneTVStreams === 'function') loaders.push(loadOneTVStreams());
-  if (typeof loadPPVTVStreams === 'function') loaders.push(loadPPVTVStreams());
-  await Promise.allSettled(loaders);
-}
 function parseESPN(ev, league) {
   const comp = ev.competitions?.[0] || {};
   const comps = comp.competitors || [];
@@ -3115,15 +3021,14 @@ function parseESPN(ev, league) {
   }
   const home = comps.find(c => c.homeAway === 'home') || comps[0] || {};
   const away = comps.find(c => c.homeAway === 'away') || comps[1] || {};
-  const display = c => c.team?.displayName || c.athlete?.displayName || c.athlete?.fullName || c.displayName || c.name || 'TBD';
   const getRawLogo = c => {
     const href = (c.team?.logos?.find(l => l.href && l.width >= 50) || c.team?.logos?.[0])?.href || '';
     return href ? href.replace(/^http:\/\//i, 'https://') : '';
   };
   return {
     id: ev.id, league, type: 'match',
-    home: { name: display(home), logo: getRawLogo(home), score: home.score ?? '' },
-    away: { name: display(away), logo: getRawLogo(away), score: away.score ?? '' },
+    home: { name: home.team?.displayName || 'TBD', logo: getRawLogo(home), score: home.score ?? '' },
+    away: { name: away.team?.displayName || 'TBD', logo: getRawLogo(away), score: away.score ?? '' },
     status, startTime
   };
 }
@@ -3135,7 +3040,7 @@ function wsrv(url, size = 200) {
   if (!url || url.startsWith('data:') || url.startsWith('blob:')) return url;
   return 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=' + size + '&h=' + size + '&fit=contain&n=-1&we';
 }
-const TSDB_INFLIGHT = new Map();
+const TSDB_INFLIGHT = new Set();
 const LOGO_TTL = 7 * 86400000, LOGO_FAILURE_TTL = 10 * 60000;
 let tsdbNextRequest = 0, tsdbBackoffUntil = 0;
 async function fetchLogo(teamName) {
@@ -3143,8 +3048,9 @@ async function fetchLogo(teamName) {
   const key = teamName.toLowerCase().trim();
   if (LOGO_OVERRIDES[key]) return LOGO_OVERRIDES[key];
   const cached = LOGO_CACHE[key]; if (cached && (Date.now() - (cached.ts || 0) < (cached.url ? LOGO_TTL : LOGO_FAILURE_TTL))) return cached.url || ''; if (cached) delete LOGO_CACHE[key];
-  if (TSDB_INFLIGHT.has(key)) return TSDB_INFLIGHT.get(key);
-  const request = (async () => { try { const wait = Math.max(0, tsdbNextRequest - Date.now(), tsdbBackoffUntil - Date.now()); if (wait) await new Promise(r => setTimeout(r, wait)); tsdbNextRequest = Date.now() + 2200;
+  if (TSDB_INFLIGHT.has(key)) { await new Promise(r => setTimeout(r, 2500)); return LOGO_CACHE[key] || ''; }
+  TSDB_INFLIGHT.add(key);
+  try { const wait = Math.max(0, tsdbNextRequest - Date.now(), tsdbBackoffUntil - Date.now()); if (wait) await new Promise(r => setTimeout(r, wait)); tsdbNextRequest = Date.now() + 2200;
     const res = await fetch(TSDB + '/searchteams.php?t=' + encodeURIComponent(teamName));
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -3157,9 +3063,7 @@ async function fetchLogo(teamName) {
     LOGO_CACHE[key] = { url: '', ts: Date.now() }; if (/429/.test(e.message || '')) tsdbBackoffUntil = Date.now() + 30000; return '';
   } finally {
     TSDB_INFLIGHT.delete(key);
-  } })();
-  TSDB_INFLIGHT.set(key, request);
-  return request;
+  }
 }
 
 async function enrichLogos(events) {
@@ -3174,7 +3078,7 @@ async function enrichLogos(events) {
   const toFetch = [...needsFetch];
   for (let i = 0; i < toFetch.length; i += 6) {
     await Promise.allSettled(toFetch.slice(i, i + 6).map(t => fetchLogo(t)));
-    if (i + 6 < toFetch.length) await Promise.all([...TSDB_INFLIGHT.values()]);
+    if (i + 6 < toFetch.length) await new Promise(r => setTimeout(r, 80));
   }
   let total = 0, resolved = 0;
   for (const ev of matchEvs) {
@@ -3748,7 +3652,7 @@ function renderMatchCard(ev) {
     '<div style="display:flex;flex-direction:column;align-items:center"><div class="ec-vs">' + (ev.home.score !== '' ? ev.home.score + ' – ' + ev.away.score : 'vs') + '</div><div class="ec-time">' + ts + '</div></div>' +
     '<div class="ec-team">' + aChip + '<div class="ec-team-name">' + ev.away.name + '</div></div></div>' +
     (pl?.postUrl ? '<div style="font-size:.62rem;color:var(--muted2)">📝 <a href="' + pl.postUrl + '" target="_blank" style="color:var(--blue)">View post</a></div>' : '') +
-    '<div class="ec-actions"><button class="btn-red btn-sm" onclick="genAndFill(\'' + sid + '\')">✍️ Gen</button><button class="btn-blue btn-sm" onclick="quickPostEv(\'' + sid + '\')">📤 Post</button><button class="btn-gold btn-sm" onclick="genThumbForEv(\'' + sid + '\')">🖼️ Thumb</button><button class="btn-orange btn-sm" onclick="openHLForEv(\'' + sid + '\')">🎬 HL</button><button class="btn-blue btn-sm" onclick="postHLForEv(\'' + sid + '\')">📤 Post HL</button></div></div>';
+    '<div class="ec-actions"><button class="btn-red btn-sm" onclick="genAndFill(\'' + sid + '\')">✍️ Gen</button><button class="btn-blue btn-sm" onclick="quickPostEv(\'' + sid + '\')">📤 Post</button><button class="btn-gold btn-sm" onclick="genThumbForEv(\'' + sid + '\')">🖼️ Thumb</button><button class="btn-orange btn-sm" onclick="openHLForEv(\'' + sid + '\')">🎬 HL</button></div></div>';
 }
 
 function renderRaceCard(ev) {
@@ -3782,7 +3686,6 @@ function getRaceImg(ev) {
 async function genAndFill(sid) {
   const ev = findEv(sid);
   if (!ev) { toast('Event not found', 'e'); return; }
-  setSEOEvent(ev);
   const fin = ev.type === 'match' && STATUS.isFinal(ev.status) && ev.home.score !== '' && ev.away.score !== '';
   const score = fin && ev.home.score !== '' ? ev.home.score + '–' + ev.away.score : '';
   let title;
@@ -3858,14 +3761,12 @@ async function quickPostEv(sid) {
   if (!accessToken) { toast('Sign in first', 'e'); return; }
   const ev = findEv(sid);
   if (!ev) return;
-  setSEOEvent(ev);
   const pl = getLog(ev);
   if (pl?.postId) {
     const confirmed = confirm('A post already exists for this event.\n\nUpdate it with new content?');
     if (!confirmed) return;
     const title = ev.type === 'race' ? ev.name + ' – Race Preview & Live Stream | Sports 803' : ev.home.name + ' vs ' + ev.away.name + ' – ' + ev.league.name + ' Live Stream | Sports 803';
-    setSEOEvent(ev);
-  const body = await buildArticleWithStreams(title, ev);
+    const body = await buildArticleWithStreams(title, ev);
     const labels = getLabels(ev);
     const dt = ev.startTime ? ev.startTime.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
     toast('Regenerating thumbnail…', 'i');
@@ -3938,39 +3839,30 @@ async function bulkPostAll() {
   toast('Bulk posting ' + toPost.length + ' events…', 'i');
   for (const ev of toPost) {
     await quickPostEv(encodeURIComponent(String(ev.id)));
-    await new Promise(r => setTimeout(r, 9000));
+    await new Promise(r => setTimeout(r, 5000));
   }
   toast('Bulk post complete ✓', 's');
 }
 async function bulkPostHighlights() {
   if (!accessToken) { toast('Sign in first', 'e'); return; }
-  const finished = allEvents.filter(ev => ev.type === 'match' && STATUS.isFinished(ev.status));
-  if (!finished.length) { toast('No finished matches found. Set the date picker to the correct day and click Fetch All first.', 'i'); return; }
-  const fresh = finished.filter(ev => !getLog(ev)?.hasHL);
-  const existing = finished.filter(ev => getLog(ev)?.hasHL && getLog(ev)?.postId);
-  const orphaned = finished.filter(ev => getLog(ev)?.hasHL && !getLog(ev)?.postId);
-  let candidates;
-  if (fresh.length && (existing.length + orphaned.length)) candidates = confirm('Finished matches include existing highlights.\n\nOK = process only new matches\nCancel = re-process all finished matches') ? fresh : finished;
-  else if (!fresh.length && (existing.length + orphaned.length)) { if (!confirm('All finished matches already have highlights. Re-process and UPDATE them all?')) return; candidates = finished; }
-  else candidates = fresh;
-  let posted=0, updated=0, failed=0; toast('Bulk highlights: 0/' + candidates.length, 'i');
+  const candidates = allEvents.filter(ev => ev.type === 'match' && STATUS.isFinal(ev.status) && !getLog(ev)?.hasHL);
+  if (!candidates.length) { toast('No unposted finished match highlights found', 'i'); return; }
+  let posted=0, failed=0; toast('Bulk highlights: 0/' + candidates.length, 'i');
   for (const ev of candidates) {
     try {
-      setSEOEvent(ev); const pl=getLog(ev);
+      let pl=getLog(ev);
       const found=pl?.hlUrl ? {playerUrl:pl.hlUrl,replayUrl:pl.replayUrl} : await searchOneBallHighlights(ev);
       if (!found?.playerUrl) { failed++; continue; }
       const title=ev.home.name+' vs '+ev.away.name+' – Highlights & Replay | Sports 803';
-      const body=await buildArticleWithClaude(title,ev,true); const html=body+'\n\n'+buildHighlightsPlayerIframe(found.playerUrl);
-      ensureSearchDescription(title, body, ev, true);
-      const status=CFG.schedStatus||'DRAFT';
-      const post=pl?.postId ? await updateExistingPost(ev,title,html,status,getLabels(ev)) : await postRaw(title,html,status,getLabels(ev));
+      const body=await buildArticleWithClaude(title,ev,true);
+      const html=body+'\n\n'+buildHighlightsPlayerIframe(found.playerUrl);
+      const post=await postRaw(title,html,CFG.schedStatus||'DRAFT',getLabels(ev));
       if (!post) { failed++; if(failed>=3){toast('Bulk highlights stopped after 3 failures','e');break;} continue; }
-      setLog(ev,{postId:post.id,postUrl:post.url,title,hasHL:true,hlUrl:found.playerUrl,replayUrl:found.replayUrl||'',status});
-      if (pl?.postId) updated++; else posted++;
-      toast('Bulk highlights: '+(posted+updated)+'/'+candidates.length+' ('+posted+' new, '+updated+' updated)', 'i'); await new Promise(r=>setTimeout(r,1500));
+      setLog(ev,{postId:post.id,postUrl:post.url,title,hasHL:true,hlUrl:found.playerUrl,replayUrl:found.replayUrl||'',status:CFG.schedStatus||'DRAFT'});
+      posted++; toast('Bulk highlights: '+posted+'/'+candidates.length,'i'); await new Promise(r=>setTimeout(r,1500));
     } catch(e) { failed++; console.warn('[bulk highlights]',e); if(failed>=3) break; }
   }
-  renderEventCards(allEvents); toast('Bulk highlights complete: '+posted+' posted, '+updated+' updated, '+failed+' failed','s');
+  renderEventCards(allEvents); toast('Bulk highlights complete: '+posted+' posted, '+failed+' failed','s');
 }
 
 function getLabels(ev) {
@@ -4682,7 +4574,7 @@ function buildRacePlayerIframe(race) {
     return type + '=' + encodeURIComponent(s.url);
   }).join('&');
   const src = playerBase + '?' + params;
-  return '<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe loading="lazy" sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" allow="encrypted-media" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" src="' + src + '" frameborder="0" scrolling="no" allowfullscreen></iframe></div>';
+  return '<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden"><iframe loading="lazy" sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation" allow="encrypted-media" style="position:absolute;top:0;left:0;width:100%;height:0;border:0" src="' + src + '" frameborder="0" scrolling="no" allowfullscreen></iframe></div>';
 }
 
 function renderFullRaces(races) {
@@ -4867,13 +4759,6 @@ function populateHLSelect() {
   }).join('');
 }
 
-function postHLForEv(sid) {
-  const ev = findEv(sid);
-  if (!ev) { toast('Event not found', 'e'); return; }
-  if (!accessToken) { toast('Sign in first', 'e'); return; }
-  openHLForEv(sid);
-  toast('Highlight editor opened — generate or review the text, then click Post / Update.', 'i');
-}
 function openHLForEv(sid) {
   refreshHighlightTemplateSelect();
   populateHLSelect();
@@ -5224,7 +5109,6 @@ function addRecentPost(title, url, status) {
   d.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px';
   d.innerHTML = '<span class="post-badge ' + (status || '').toLowerCase() + '">' + status + '</span><span style="flex:1;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + title + '</span>' + (url ? '<a href="' + url + '" target="_blank" style="font-size:.68rem;color:var(--blue)">View</a>' : '');
   list.prepend(d);
-  while (list.children.length > 100) list.removeChild(list.lastElementChild);
   updateStats();
 }
 
@@ -5299,7 +5183,6 @@ function showPage(id) {
   if (page) page.classList.add('active');
   document.querySelectorAll('.nav-pill').forEach(b => { if (b.getAttribute('onclick')?.includes("'" + id + "'")) b.classList.add('active'); });
   document.querySelectorAll('.mobile-nav-pill').forEach(b => b.classList.toggle('active', b.dataset.mobilePage === id));
-  if (id === 'compose') loadDraft();
   if (id === 'fullraces' && fullRacesData.length) renderFullRaces(fullRacesData);
   if (id === 'templates') renderTemplateList();
   closeMobileMenu();
@@ -5397,21 +5280,18 @@ function sendTBToCompose() {
 //  SEO
 // ============================================================
 function updateSearchDescriptionCount(){const el=document.getElementById('post-search-description'),c=document.getElementById('search-description-count');if(el&&c){c.textContent=el.value.length+'/150';c.style.color=el.value.length>=120&&el.value.length<=150?'var(--green)':'var(--muted2)';}}
-function setSEOEvent(ev){ if(ev) currentSEOEvent=ev; return currentSEOEvent; }
-function ensureSearchDescription(title=v('post-title'), body=document.getElementById('post-body')?.value||'', ev=null, force=false){const el=document.getElementById('post-search-description');if(!el)return '';setSEOEvent(ev);if(force||!el.value.trim()||el.dataset.auto==='true'){el.value=makeSearchDescription(title,body,currentSEOEvent);el.dataset.auto='true';}updateSearchDescriptionCount();return el.value.trim().slice(0,150);}
+function ensureSearchDescription(title=v('post-title'), body=document.getElementById('post-body')?.value||''){const el=document.getElementById('post-search-description');if(!el)return '';if(!el.value.trim()||el.dataset.auto==='true'){el.value=makeSearchDescription(title,body);el.dataset.auto='true';}updateSearchDescriptionCount();return el.value.trim().slice(0,150);}
 function seoCleanText(value){let text=String(value||'').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ').replace(/<img[^>]*>/gi,' ').replace(/<[^>]+>/g,' ').replace(/https?:\/\/\S+/gi,' ').replace(/&nbsp;|&#160;/gi,' ').replace(/&amp;/gi,'&').replace(/&quot;/gi,'\"').replace(/&#39;|&apos;/gi,"'").replace(/\s+/g,' ').trim();return text;}
 function seoFit(text,max=150){const clean=String(text||'').replace(/\s+/g,' ').trim();if(clean.length<=max)return clean;const cut=clean.slice(0,max+1);const boundary=Math.max(cut.lastIndexOf(' '),cut.lastIndexOf('.'),cut.lastIndexOf('!'),cut.lastIndexOf('?'));return (boundary>90?cut.slice(0,boundary):cut.slice(0,max)).replace(/[\s,;:–—-]+$/,'').trim();}
-function makeSearchDescription(title, body, ev=currentSEOEvent){
+function makeSearchDescription(title, body){
   const cleanTitle=seoCleanText(title)||'Sports 803 live sports coverage';
   const cleanBody=seoCleanText(body);
-  const league=seoCleanText(ev?.league?.name||v('c-league')||v('post-league'));
-  const date=seoCleanText(ev?.startTime ? ev.startTime.toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : (v('c-datetime')||v('post-datetime')));
-  const teams=ev?.type==='match' ? [ev.home?.name, ev.away?.name].filter(Boolean).join(' vs ') : '';
-  const contextTitle=teams && !cleanTitle.toLowerCase().includes(teams.toLowerCase()) ? teams+' · '+cleanTitle : cleanTitle;
+  const league=seoCleanText(v('c-league')||v('post-league'));
+  const date=seoCleanText(v('c-datetime')||v('post-datetime'));
   const facts=[league,date].filter(f=>f&&f.length>3&&!cleanTitle.toLowerCase().includes(f.toLowerCase()));
   const sentences=(cleanBody.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[]).map(x=>x.trim()).filter(x=>x.length>=35&&!/^https?:/i.test(x));
   const meaningful=sentences.filter(x=>!/^#|^(watch|stream|click|subscribe|follow us|sports 803\s*[—-])/i.test(x));
-  let summary=contextTitle;
+  let summary=cleanTitle;
   if(facts.length)summary+=' | '+facts.slice(0,1).join('');
   for(const sentence of meaningful){if(summary.toLowerCase().includes(sentence.toLowerCase()))continue;const candidate=summary+'. '+sentence;if(candidate.length<=150){summary=candidate;continue;}if(summary.length<115){summary=seoFit(candidate); }break;}
   return seoFit(summary,150);
@@ -5432,13 +5312,12 @@ function updateSEO() {
   document.getElementById('seo-l-score').textContent = lb + ' labels';
 }
 
-function previewPost() { document.getElementById('preview-title').textContent = v('post-title'); const src=document.getElementById('post-body').value.replace(/\n/g, '<br>'); const doc=new DOMParser().parseFromString(src,'text/html'); doc.querySelectorAll('script,style,object,embed,iframe').forEach(n=>n.remove()); doc.querySelectorAll('*').forEach(n=>{[...n.attributes].forEach(a=>{if(/^on/i.test(a.name)||(/^(href|src)$/i.test(a.name)&&/^javascript:/i.test(a.value)))n.removeAttribute(a.name);});}); document.getElementById('preview-body').replaceChildren(...[...doc.body.childNodes].map(n=>document.importNode(n,true))); openModal('modal-preview'); }
+function previewPost() { document.getElementById('preview-title').textContent = v('post-title'); document.getElementById('preview-body').innerHTML = document.getElementById('post-body').value.replace(/\n/g, '<br>'); openModal('modal-preview'); }
 
 // ============================================================
 //  BUILD ARTICLE WITH STREAMS (with race support)
 // ============================================================
 async function buildArticleWithStreams(title, ev, isHighlights = false) {
-  setSEOEvent(ev);
   const base = await buildArticleWithClaude(title, ev, isHighlights);
   if (!CFG.autoFetchStreams || CFG.embedStreamsInPost === false || !ev) return base;
   try {
@@ -5450,12 +5329,12 @@ async function buildArticleWithStreams(title, ev, isHighlights = false) {
 
 async function buildArticleWithClaude(title, ev, isHighlights = false) {
   const cacheKey = (ev ? evKey(ev) : title) + (isHighlights ? '|hl' : '');
-  if (dsArticleCache[cacheKey]) { dsArticleCacheOrder = [cacheKey, ...dsArticleCacheOrder.filter(k => k !== cacheKey)]; return dsArticleCache[cacheKey]; }
+  if (dsArticleCache[cacheKey]) return dsArticleCache[cacheKey];
   if (CFG.deepseekKey) {
     try {
       const prompt = buildClaudePrompt(title, ev, isHighlights);
       const article = await callClaude(prompt);
-      dsArticleCache[cacheKey] = article; dsArticleCacheOrder = [cacheKey, ...dsArticleCacheOrder.filter(k => k !== cacheKey)]; while (dsArticleCacheOrder.length > 100) delete dsArticleCache[dsArticleCacheOrder.pop()];
+      dsArticleCache[cacheKey] = article; const keys=Object.keys(dsArticleCache); if(keys.length>100) delete dsArticleCache[keys[0]];
       return article;
     } catch (e) { console.warn('[Claude] Article gen failed, using fallback:', e.message); }
   }
@@ -5589,7 +5468,7 @@ function applyConfigToUI() {
   if (document.getElementById('cfg-embed-streams-in-post')) document.getElementById('cfg-embed-streams-in-post').checked = CFG.embedStreamsInPost !== false;
   set('cfg-deepseek-key', CFG.deepseekKey || '');
   set('cfg-deepseek-tone', CFG.deepseekTone || '');
-  if (document.getElementById('cfg-deepseek-model')) document.getElementById('cfg-deepseek-model').value = CFG.deepseekModel || 'claude-sonnet-5';
+  if (document.getElementById('cfg-deepseek-model')) document.getElementById('cfg-deepseek-model').value = CFG.deepseekModel || 'claude-sonnet-4-20250514';
   if (document.getElementById('cfg-deepseek-length')) document.getElementById('cfg-deepseek-length').value = CFG.deepseekLength || 'medium';
   updateClaudeStatus();
 }
@@ -5607,7 +5486,7 @@ document.addEventListener('DOMContentLoaded', () => {
   startOAuth();
   try {
     const savedToken = sessionStorage.getItem(SK_BLOGGER_SESSION);
-    if (savedToken) { accessToken = savedToken; updateAuthUI(true); setTimeout(validateStoredSession, 700); }
+    if (savedToken) { accessToken = savedToken; updateAuthUI(true); setTimeout(fetchBloggerInfo, 700); }
   } catch (e) {}
   if (fullRacesData.length) renderFullRaces(fullRacesData);
   if (CFG.schedEnabled) { document.getElementById('sched-enabled').checked = true; startSched(); }
@@ -5615,7 +5494,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateIframeBox();
   // Restore only the current event's draft after explicit confirmation.
   updateSearchDescriptionCount();
-  // Drafts are restored only when the user explicitly opens Compose.
+  loadDraft();
   const cv = document.getElementById('compose-canvas');
   const ctx = cv.getContext('2d');
   ctx.fillStyle = '#0c1018';
@@ -5662,10 +5541,10 @@ document.addEventListener('DOMContentLoaded', () => {
   window.stripInjectedBlocks=function(html){return String(html||'').replace(/<div id="s803-highlights-player"[\s\S]*?<\/div>\s*(?=<|$)/gi,'').replace(/<div id="s803-hl-thumb"[\s\S]*?<\/div>\s*(?=<|$)/gi,'');};
   window.buildHighlightsPlayerIframe=function(url){if(!url)return '';const canonical=canonicalOneBallReplayUrl(String(url).split('?')[0]),base=playerBaseUrl();let src=String(url);if(!src.includes('?mora=')&&!src.includes('&mora=')&&!src.includes('?one=')&&!src.includes('&one='))src=base+'?one='+canonical;return '<div id="s803-highlights-player" data-canonical="'+canonical.replace(/"/g,'&quot;')+'" style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px"><iframe loading="lazy" src="'+src+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:10px" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>';};
   window.getLabels=function(ev){const base={ucl:['UEFA Champions League','UCL','Football Live Stream','Sports 803'],epl:['Premier League','EPL','Football Live Stream','Sports 803'],laliga:['La Liga','Spanish Football','Football Live Stream','Sports 803'],seriea:['Serie A','Italian Football','Sports 803'],bundesliga:['Bundesliga','German Football','Sports 803'],f1:['Formula 1','F1','Grand Prix','Sports 803'],nba:['NBA','Basketball','Sports 803'],nfl:['NFL','American Football','Sports 803'],ufc:['UFC','MMA','Sports 803']}[ev.league?.id]||['Sports 803'];return [...new Set([...base,'s803:'+evKey(ev),...(ev.home?.name?[ev.home.name]:[]),...(ev.away?.name?[ev.away.name]:[])])];};
-  window.STATUS={isFinished:s=>/\b(final|ft|full[\s-]?time|ended|finished|completed|aet|after[\s-]+extra[\s-]+time|after[\s-]+penalties|post[\s-]?match|pens)\b/i.test(s||''),isFinal:s=>/\b(final|ft|full[\s-]?time|ended|finished|completed|aet|after[\s-]+extra[\s-]+time|after[\s-]+penalties|post[\s-]?match|pens)\b/i.test(s||''),isLive:s=>/\b(in[\s-]?progress|live|halftime|half[\s-]?time|1st half|2nd half|end of regulation|overtime|ot)\b/i.test(s||''),isDead:s=>/\b(postponed|cancel(l)?ed|suspended|abandoned|delayed)\b/i.test(s||''),isSched:s=>!STATUS.isFinal(s)&&!STATUS.isLive(s)&&!STATUS.isDead(s),badgeClass:s=>STATUS.isLive(s)?'live':STATUS.isFinal(s)?'final':STATUS.isDead(s)?'dead':'sched',label:s=>s||'Scheduled'};
+  window.STATUS={isFinal:s=>/\b(final|ft|full[\s-]?time|ended|finished|completed|aet|penalties|post[\s-]?match)\b/i.test(s||''),isLive:s=>/\b(in[\s-]?progress|live|halftime|half[\s-]?time|1st half|2nd half|end of regulation|overtime|ot)\b/i.test(s||''),isDead:s=>/\b(postponed|cancel(l)?ed|suspended|abandoned|delayed)\b/i.test(s||''),isSched:s=>!STATUS.isFinal(s)&&!STATUS.isLive(s)&&!STATUS.isDead(s),badgeClass:s=>STATUS.isLive(s)?'live':STATUS.isFinal(s)?'final':STATUS.isDead(s)?'dead':'sched',label:s=>s||'Scheduled'};
   window.fetchPostBody=async function(postId){if(!accessToken||!CFG.blogId)return null;const id=extractPostIdFromUrl(postId)||await resolvePostUrlToId(postId);if(!id)return null;try{const r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+id,{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();return {id:d.id,title:d.title||'',content:d.content||'',labels:d.labels||[],url:d.url||''};}catch(e){console.warn('[fetchPostBody]',e.message);return null;}};
-  window.postRaw=async function(title,html,status,labels,publishDate=null){if(!CFG.blogId||!accessToken)return null;let url='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+(status==='LIVE'?'':'?isDraft=true');let r,last; for(let attempt=0;attempt<4;attempt++){try{r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({kind:'blogger#post',blog:{id:CFG.blogId},title,content:html,labels:labels||['Sports 803'],searchDescription:ensureSearchDescription(title,html,currentSEOEvent,true).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})})}); if(r.ok)return r.json(); last=r.status; if(![429,500,502,503,504].includes(r.status))break; await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}} toast('Post failed after retries: Blogger '+last,'e'); return null;};
-  window.updateExistingPost=async function(ev,title,html,status,labels,publishDate=null){const pl=ev?getLog(ev):null,id=editingPostId||pl?.postId;if(!id){toast('No post ID to update','e');return null}const body={kind:'blogger#post',id,blog:{id:CFG.blogId},title,content:html,labels:labels||[],searchDescription:ensureSearchDescription(title,html,currentSEOEvent,true).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})};let r,last;for(let attempt=0;attempt<4;attempt++){try{r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+id,{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.ok){const p=await r.json();if(ev)setLog(ev,{postId:p.id,postUrl:p.url,status,title,league:ev.league?.name});toast('Post updated ✓','s');return p}last=r.status;if(![429,500,502,503,504].includes(r.status))break;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}}toast('Update failed after retries: Blogger '+last,'e');return null;};
+  window.postRaw=async function(title,html,status,labels,publishDate=null){if(!CFG.blogId||!accessToken)return null;let url='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+(status==='LIVE'?'':'?isDraft=true');let r,last; for(let attempt=0;attempt<4;attempt++){try{r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({kind:'blogger#post',blog:{id:CFG.blogId},title,content:html,labels:labels||['Sports 803'],searchDescription:(ensureSearchDescription(title,html)||makeSearchDescription(title,html)).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})})}); if(r.ok)return r.json(); last=r.status; if(![429,500,502,503,504].includes(r.status))break; await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}} toast('Post failed after retries: Blogger '+last,'e'); return null;};
+  window.updateExistingPost=async function(ev,title,html,status,labels,publishDate=null){const pl=ev?getLog(ev):null,id=editingPostId||pl?.postId;if(!id){toast('No post ID to update','e');return null}const body={kind:'blogger#post',id,blog:{id:CFG.blogId},title,content:html,labels:labels||[],searchDescription:(ensureSearchDescription(title,html)||makeSearchDescription(title,html)).slice(0,150),...(publishDate&&status==='LIVE'?{published:publishDate}:{})};let r,last;for(let attempt=0;attempt<4;attempt++){try{r=await fetch('https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts/'+id,{method:'PUT',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.ok){const p=await r.json();if(ev)setLog(ev,{postId:p.id,postUrl:p.url,status,title,league:ev.league?.name});toast('Post updated ✓','s');return p}last=r.status;if(![429,500,502,503,504].includes(r.status))break;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}catch(e){last=e.message;await new Promise(x=>setTimeout(x,1000*Math.pow(2,attempt)));}}toast('Update failed after retries: Blogger '+last,'e');return null;};
   // Preserve the v9 search implementation under a private alias, then add canonical persistence.
   const originalSearch=searchOneBallHighlights;
   window.searchOneBallHighlights=async function(ev){const r=await originalSearch(ev);if(r){const replayUrl=r.replayUrl||r.replayPageUrl||'';setLog(ev,{hasHL:true,hlUrl:r.playerUrl,replayUrl,oneMatchId:extractReplayId(replayUrl),hlCanonical:replayUrl.split('?')[0],hlFetchedAt:Date.now()});}return r;};
@@ -5684,28 +5563,6 @@ window.buildRichHighlightSections=function(ev){const h=ev.home?.name||'Home',a=e
   window.syncPostLogFromBlogger=async function(){if(!accessToken||!CFG.blogId){toast('Sign in and set Blog ID first','w');return}try{let pageToken='',items=[];do{const q='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts?maxResults=500&fetchBodies=false'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');const r=await fetch(q,{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();items.push(...(d.items||[]));pageToken=d.nextPageToken||'';}while(pageToken);let synced=0;items.forEach(p=>{const labels=p.labels||[];const markers=labels.filter(x=>x.indexOf('s803:')===0);if(!markers.length){const title=String(p.title||'').toLowerCase();const match=allEvents.find(ev=>{const a=(ev.home?.name||ev.name||'').toLowerCase(),b=(ev.away?.name||'').toLowerCase();return a&&title.includes(a)&&(b?title.includes(b):true)});if(match)markers.push('s803:'+evKey(match));}markers.forEach(marker=>{const k=marker.slice(5);if(!k||k==='hl')return;postLog[k]={...(postLog[k]||{}),postId:p.id,postUrl:p.url,title:p.title,status:p.status,searchDescription:p.searchDescription||postLog[k]?.searchDescription||'',bloggerSyncedAt:Date.now(),ts:postLog[k]?.ts||Date.now()};synced++;});});saveV10();renderPostLog();renderPostLogDiagnostics();updateStats();toast('Synced '+synced+' Sports 803 post IDs/URLs from Blogger ✓','s')}catch(e){toast('Blogger sync failed: '+e.message,'e')}};
   window.renderPostLogDiagnostics=function(){const el=document.getElementById('post-log-diagnostics-body');if(!el)return;const es=logEntries();const ids={};es.forEach(([k,v])=>{if(v.postId)(ids[v.postId]??=[]).push(k)});const dup=Object.entries(ids).filter(([,ks])=>ks.length>1).map(([id])=>id);el.innerHTML='Total entries: '+es.length+' · with postId: '+es.filter(([,v])=>v.postId).length+' · hasHL: '+es.filter(([,v])=>v.hasHL).length+' · duplicate postIds: '+(dup.join(', ')||'none')+' · orphaned race keys: '+es.filter(([k])=>k.startsWith('race_')).length;};
   window.repairPostLog=function(){postLog=migratePostLog(postLog);prunePostLog();saveV10();renderPostLog();renderPostLogDiagnostics();toast('Post log repaired ✓','s');};
-  function highlightUrlFromBody(html){ const raw=String(html||''); const m=raw.match(/(?:src|data-url)=["']([^"']*(?:replay|oneball|player)[^"']*)["']/i); return m?m[1]:''; }
-  window.postHighlights=async function(){
-    if(!accessToken){toast('Sign in first','e');return;}
-    const ev=allEvents[parseInt(v('hl-select'))]; if(!ev){toast('Select an event first','w');return;}
-    const body=v('hl-body'), manual=v('hl-manual-post-url'); if(!body){toast('Write/generate text first','i');return;}
-    if(manual){const id=await resolvePostUrlToId(manual);if(!id){toast('Could not resolve this URL — check the post still exists.','e');return}const pl=getLog(ev);if(pl?.postId&&String(pl.postId)!==String(id)&&!document.getElementById('hl-override-confirm')?.checked){toast('Confirm the manual override first','w');return}setLog(ev,{postId:id,postUrl:manual});}
-    const pl=getLog(ev), video=v('hl-video'), thumb=v('hl-thumb-url'), title=(ev.home?.name||ev.name)+' vs '+(ev.away?.name||'')+' – Highlights & Replay | Sports 803';
-    setSEOEvent(ev); ensureSearchDescription(title,body,ev,true);
-    let enrichedBody=body; if(!/Match Overview|Match Details/i.test(enrichedBody)||enrichedBody.trim().split(/\s+/).length<350) enrichedBody+='\n\n'+buildRichHighlightSections(ev);
-    let html=''; if(thumb) html+='<div id="s803-hl-thumb"><img src="'+thumb+'" style="max-width:100%;height:auto;border-radius:10px;margin-bottom:18px"></div>\n'; html+=stripInjectedBlocks(enrichedBody); if(video) html+='\n\n'+buildHighlightsPlayerIframe(video);
-    const status=v('hl-post-status')||'LIVE', post=pl?.postId?await updateExistingPost(ev,title,html,status,getLabels(ev)):await postRaw(title,html,status,getLabels(ev));
-    if(post){setLog(ev,{postId:post.id,postUrl:post.url,title,hasHL:true,status,thumb:thumb||pl?.thumb||null});toast(status==='LIVE'?'Highlights published ✓':'Highlights saved as draft ✓','s');closeModal('modal-hl');renderEventCards(allEvents);}
-  };
-  // Recover replay URLs from already-posted Blogger highlight bodies before deciding an update is impossible.
-  const bulkHLOriginal=window.bulkPostHighlights;
-  window.bulkPostHighlights=async function(){
-    if(!accessToken){toast('Sign in first','e');return;}
-    const finished=allEvents.filter(ev=>ev.type==='match'&&STATUS.isFinished(ev.status));
-    if(!finished.length){toast('No finished matches found. Set the date picker to the correct day and click Fetch All first.','i');return;}
-    for(const ev of finished){const pl=getLog(ev);if(pl?.postId&&!pl.hlUrl){const post=await fetchPostBody(pl.postId);const url=highlightUrlFromBody(post?.content);if(url)setLog(ev,{hasHL:true,hlUrl:url,replayUrl:url});}}
-    return bulkHLOriginal();
-  };
   // Rebind manual URL preview without changing existing UI.
   document.addEventListener('input',e=>{if(e.target.id==='hl-manual-post-url')updateHLResolution();});
   renderPostLogDiagnostics();
