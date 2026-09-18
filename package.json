@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "auto-publish": "node scripts/onetv-autopost.mjs"
+    "auto-publish": "node scripts/onetv-autopost.mjs",
+    "test": "node --test"
   }
 }

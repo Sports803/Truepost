@@ -55,6 +55,17 @@ function pairKey(home, away) {
   return [normalizeTeamName(home), normalizeTeamName(away)].sort().join('|');
 }
 
+function oneBallPageUrl(id, kind = 'live') {
+  return new URL('/' + kind + '/' + encodeURIComponent(String(id)) + '.html', SOURCE_URL).href;
+}
+
+function buildOneBallPlayerUrl(pageUrl, embedUrls = []) {
+  const base = PLAYER_BASE_URL.replace(/\/$/, '');
+  if (!pageUrl) return '';
+  const embeds = [...new Set(embedUrls.filter(Boolean))].map(url => '&embed=' + encodeURIComponent(url)).join('');
+  return base + '/?one=' + pageUrl + embeds;
+}
+
 function parseOneTV(html) {
   const results = [];
   const seen = new Set();
@@ -76,8 +87,9 @@ function parseOneTV(html) {
     if (!homeName || !awayName) continue;
     const league = innerByClass(block, 'league-badge') || attr(opening, 'data-league') || 'OneTV';
     const date = parseDate(attr(opening, 'data-match-time') || attr(opening, 'data-time'));
+    const pageUrl = oneBallPageUrl(id, 'live');
     const streamUrl = `${STREAM_BASE_URL.replace(/\/$/, '')}/${encodeURIComponent(id)}.m3u8`;
-    const playerUrl = buildPlayerUrl(streamUrl);
+    const playerUrl = buildOneBallPlayerUrl(pageUrl);
     seen.add(id);
     results.push({
       oneballId: id,
@@ -86,6 +98,7 @@ function parseOneTV(html) {
       league,
       date: date.toISOString(),
       streamUrl,
+      pageUrl,
       playerUrl,
       homeLogo: imageByClass(block, 'team-home|home-team'),
       awayLogo: imageByClass(block, 'team-away|away-team')
@@ -116,7 +129,7 @@ async function fetchOneBallReplays() {
       const homeName = stripTags(homeM[1]);
       const awayName = stripTags(awayM[1]);
       const key = pairKey(homeName, awayName);
-      results.push({ id, homeName, awayName, key, url: new URL(href, SOURCE_URL).href });
+      results.push({ id, homeName, awayName, key, url: new URL(href, SOURCE_URL).href, replayPageUrl: new URL(href, SOURCE_URL).href });
     }
     console.log(`[REPLAY] Found ${results.length} replay cards`);
     return results;
@@ -376,21 +389,13 @@ async function main() {
     try {
       const embedUrls = ppvTVMatches[pKey] || [];
       const replay = replays.find(r => r.key === pKey);
-      let replayStreamUrl = null;
-      let replayPlayerUrl = null;
-      
-      if (replay) {
-        replayStreamUrl = await fetchReplayStream(replay.url);
-        if (replayStreamUrl) {
-          // Use the exact mora format requested: https://sports803.github.io/player/?mora=URL_ENCODED_STREAM
-          replayPlayerUrl = `${PLAYER_BASE_URL.replace(/\/$/, '')}/?mora=${encodeURIComponent(replayStreamUrl)}`;
-        }
-      }
+      const replayStreamUrl = null;
+      const replayPlayerUrl = replay ? buildOneBallPlayerUrl(replay.replayPageUrl || replay.url) : null;
       
       const publishItem = { 
         ...item, 
         embedUrls, 
-        playerUrl: buildPlayerUrl(item.streamUrl, embedUrls),
+        playerUrl: buildOneBallPlayerUrl(item.pageUrl || oneBallPageUrl(item.oneballId, 'live'), embedUrls),
         sourceUrl: SOURCE_URL,
         replayStreamUrl,
         replayPlayerUrl
@@ -416,4 +421,4 @@ if (process.argv[1] && new URL(`file://${process.argv[1]}`).href === import.meta
   main().catch(error => { console.error(error); process.exitCode = 1; });
 }
 
-export { parseOneTV, buildPlayerUrl, pairKey, loadPPVTVMatches, buildEditorialContent, hasMinimumPostQuality };
+export { parseOneTV, buildPlayerUrl, buildOneBallPlayerUrl, oneBallPageUrl, pairKey, loadPPVTVMatches, buildEditorialContent, hasMinimumPostQuality };

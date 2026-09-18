@@ -2855,6 +2855,7 @@ async function fetchBloggerInfo() {
     saveAll();
     updateAuthUI(true);
     toast(bloggerBlogs.length + ' Blogger blog(s) loaded ✓', 's');
+    if (CFG.blogId && window.syncPostLogFromBlogger) window.syncPostLogFromBlogger(true);
   } catch (e) {
     console.warn('[Blogger auth]', e.message);
     toast('Could not load Blogger blogs: ' + e.message, 'e');
@@ -4366,6 +4367,20 @@ async function testDDKanquLookup() {
 // ============================================================
 //  HIGHLIGHTS PLAYER
 // ============================================================
+function canonicalOneBallLiveUrl(url) {
+  let raw = String(url || '').trim();
+  try {
+    const parsed = new URL(raw, 'https://oneball.live');
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const id = (parts.pop() || '').replace(/\.html?$/i, '');
+    if (/^\d+$/.test(id)) return 'https://oneball.live/live/' + id + '.html';
+    raw = parsed.href;
+  } catch (e) {}
+  return raw.replace('https://oneball.live//', 'https://oneball.live/');
+}
+function oneBallPlayerUrl(pageUrl) {
+  return playerBaseUrl() + '?one=' + String(pageUrl || '').split('?')[0];
+}
 function canonicalOneBallReplayUrl(url) {
   let raw = String(url || '').trim();
   try {
@@ -4383,7 +4398,7 @@ function buildHighlightsPlayerIframe(url) {
   const replay = canonicalOneBallReplayUrl(url);
   const playerBase = playerBaseUrl();
   let src = replay;
-  if (!replay.includes('?mora=') && !replay.includes('&mora=') && !replay.includes('?one=') && !replay.includes('&one=')) src = playerBase + '?one=' + replay;
+  if (!replay.includes('?one=') && !replay.includes('&one=') && !replay.includes('?mora=') && !replay.includes('&mora=')) src = oneBallPlayerUrl(replay);
   return '<div style="margin:18px 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px"><iframe loading="lazy" src="' + src + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:10px" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>';
 }
 
@@ -4452,7 +4467,7 @@ async function searchOneBallHighlights(ev) {
   const links=[...doc.querySelectorAll('a[href]')]; for(const a of links){if(oneBallMatchFound(a.textContent+' '+a.getAttribute('href'),home,away)){try{matchUrl=new URL(a.getAttribute('href'), 'https://oneball.live').href}catch(e){} if(matchUrl)break;}}
   if(!matchUrl){const md=listHtml.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+\/replay\/[^\s)]+)\)/gi)||[];for(const x of md){const q=x.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/i);if(q&&oneBallMatchFound(q[1],home,away)){matchUrl=q[2];break}}}
   if(!matchUrl){toast('No matching replay found on OneBall for '+home+' vs '+away,'w');return null;}
-  const canonical=canonicalOneBallReplayUrl(matchUrl.split('?')[0]); const playerUrl=playerBaseUrl()+'?one='+canonical;
+  const canonical=canonicalOneBallReplayUrl(matchUrl.split('?')[0]); const playerUrl=oneBallPlayerUrl(canonical);
   const result={url:playerUrl,playerUrl,replayUrl:canonical,title:home+' vs '+away+' Highlights'};
   setLog(ev,{hasHL:true,hlUrl:playerUrl,replayUrl:canonical,oneMatchId:extractReplayId(canonical),hlCanonical:canonical,hlFetchedAt:Date.now()});
   return result;
@@ -5560,7 +5575,7 @@ window.buildRichHighlightSections=function(ev){const h=ev.home?.name||'Home',a=e
   oldLoadAll();
   const raw=localStorage.getItem(SK_POST);try{const j=JSON.parse(raw||'{}');postLog=migratePostLog(j.data||j);if(!j.schema||j.schema!==2)saveV10();}catch(e){postLog={};}prunePostLog();
   window.renderPostLog=function(){const tb=document.getElementById('log-tbody');if(!tb)return;const es=logEntries().map(x=>x[1]).sort((a,b)=>(b.ts||0)-(a.ts||0));tb.innerHTML=es.length?es.map(p=>'<tr><td>'+ (p.title||'—')+'</td><td><button class="btn-ghost btn-xs" onclick="navigator.clipboard.writeText(\''+(p.postId||'')+'\')">'+(p.postId||'—')+'</button></td><td>'+(p.league||'—')+'</td><td>'+(p.thumb?'🖼️ Yes':'—')+'</td><td>'+(p.status||'draft')+'</td><td>'+(p.hasHL?'✓':'—')+'</td><td>'+(p.ts?new Date(p.ts).toLocaleString():'—')+'</td><td>'+(p.postUrl?'<a href="'+p.postUrl+'" target="_blank">View</a>':'—')+'</td></tr>').join(''):'<tr><td colspan="8">No posts yet.</td></tr>';};
-  window.syncPostLogFromBlogger=async function(){if(!accessToken||!CFG.blogId){toast('Sign in and set Blog ID first','w');return}try{let pageToken='',items=[];do{const q='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts?maxResults=500&fetchBodies=false'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');const r=await fetch(q,{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();items.push(...(d.items||[]));pageToken=d.nextPageToken||'';}while(pageToken);let synced=0;items.forEach(p=>{const labels=p.labels||[];const markers=labels.filter(x=>x.indexOf('s803:')===0);if(!markers.length){const title=String(p.title||'').toLowerCase();const match=allEvents.find(ev=>{const a=(ev.home?.name||ev.name||'').toLowerCase(),b=(ev.away?.name||'').toLowerCase();return a&&title.includes(a)&&(b?title.includes(b):true)});if(match)markers.push('s803:'+evKey(match));}markers.forEach(marker=>{const k=marker.slice(5);if(!k||k==='hl')return;postLog[k]={...(postLog[k]||{}),postId:p.id,postUrl:p.url,title:p.title,status:p.status,searchDescription:p.searchDescription||postLog[k]?.searchDescription||'',bloggerSyncedAt:Date.now(),ts:postLog[k]?.ts||Date.now()};synced++;});});saveV10();renderPostLog();renderPostLogDiagnostics();updateStats();toast('Synced '+synced+' Sports 803 post IDs/URLs from Blogger ✓','s')}catch(e){toast('Blogger sync failed: '+e.message,'e')}};
+  window.syncPostLogFromBlogger=async function(silent=false){if(!accessToken||!CFG.blogId){if(!silent)toast('Sign in and set Blog ID first','w');return}try{let pageToken='',items=[];do{const q='https://www.googleapis.com/blogger/v3/blogs/'+CFG.blogId+'/posts?maxResults=500&fetchBodies=false'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');const r=await fetch(q,{headers:{Authorization:'Bearer '+accessToken}});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();items.push(...(d.items||[]));pageToken=d.nextPageToken||'';}while(pageToken);let synced=0;items.forEach(p=>{const labels=p.labels||[];const markers=labels.filter(x=>x.indexOf('s803:')===0);if(!markers.length){const title=String(p.title||'').toLowerCase();const match=allEvents.find(ev=>{const a=(ev.home?.name||ev.name||'').toLowerCase(),b=(ev.away?.name||'').toLowerCase();return a&&title.includes(a)&&(b?title.includes(b):true)});if(match)markers.push('s803:'+evKey(match));}markers.forEach(marker=>{const k=marker.slice(5);if(!k||k==='hl')return;postLog[k]={...(postLog[k]||{}),postId:p.id,postUrl:p.url,title:p.title,status:p.status,searchDescription:p.searchDescription||postLog[k]?.searchDescription||'',bloggerSyncedAt:Date.now(),ts:postLog[k]?.ts||Date.now()};synced++;});});saveV10();renderPostLog();renderPostLogDiagnostics();updateStats();if(!silent)toast('Synced '+synced+' Sports 803 post IDs/URLs from Blogger ✓','s')}catch(e){console.warn('[Blogger sync]',e.message);if(!silent)toast('Blogger sync failed: '+e.message,'e')}};
   window.renderPostLogDiagnostics=function(){const el=document.getElementById('post-log-diagnostics-body');if(!el)return;const es=logEntries();const ids={};es.forEach(([k,v])=>{if(v.postId)(ids[v.postId]??=[]).push(k)});const dup=Object.entries(ids).filter(([,ks])=>ks.length>1).map(([id])=>id);el.innerHTML='Total entries: '+es.length+' · with postId: '+es.filter(([,v])=>v.postId).length+' · hasHL: '+es.filter(([,v])=>v.hasHL).length+' · duplicate postIds: '+(dup.join(', ')||'none')+' · orphaned race keys: '+es.filter(([k])=>k.startsWith('race_')).length;};
   window.repairPostLog=function(){postLog=migratePostLog(postLog);prunePostLog();saveV10();renderPostLog();renderPostLogDiagnostics();toast('Post log repaired ✓','s');};
   // Rebind manual URL preview without changing existing UI.
